@@ -2,7 +2,6 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sistema HyS — Control de Obras</title>
 <!-- Deployed at: https://yingoseguridadehigiene.github.io/sistema-hs/sistema_hs.html -->
@@ -211,9 +210,9 @@ td.cat-name{padding:7px 9px;font-weight:700;color:#1a2535;font-size:11px;border-
       <button onclick="document.getElementById('import-inp').click()" style="flex:1;background:#243048;border:1px solid #4a6080;border-radius:5px;padding:5px;font-size:10px;color:#6a9fc8;cursor:pointer" title="Importar backup JSON">⬆ Importar</button>
     </div>
     <input type="file" id="import-inp" accept=".json" style="display:none" onchange="importData(this)">
+    <div style="font-size:9px;color:#6a7f98;text-align:center;margin-top:3px">☁ Guardado automático en la nube<br>Accedé desde cualquier dispositivo</div>
     <div id="save-indicator" style="font-size:9px;color:#4a7a50;text-align:center;margin-top:4px;opacity:0;transition:opacity .5s"></div>
-    <button onclick="connectDrive()" id="btn-drive" style="width:100%;margin-top:5px;background:#1a4fa0;border:none;border-radius:5px;padding:6px;font-size:10px;color:#fff;cursor:pointer;font-weight:700">☁ Conectar Google Drive</button>
-    <div style="font-size:9px;color:#6a7f98;text-align:center;margin-top:3px;line-height:1.4">Guardado en Drive de<br>yingoseguridadehigiene@gmail.com</div></div>
+</div>
 </div>
 
 <div class="main">
@@ -227,11 +226,12 @@ td.cat-name{padding:7px 9px;font-weight:700;color:#1a2535;font-size:11px;border-
         <div class="obra-meta-bar" id="tl-meta"></div>
       </div>
       <button class="btn-sm btn-gray" id="tl-btn-edit" onclick="openObraModal(true)" style="display:none">✎ Editar</button>
-      <button class="btn-sm btn-blue" id="tl-btn-pdf" onclick="document.getElementById('pdf-inp').click()" style="display:none">📄 Cargar PS</button>
+      <button class="btn-sm btn-blue" id="tl-btn-pdf" onclick="document.getElementById('pdf-inp').click()" style="display:none" title="Cargar Programa de Seguridad (PDF)">📄 Prog. Seguridad</button>
       <input type="file" id="pdf-inp" accept="application/pdf" style="display:none" onchange="handlePDF(this)">
       <button class="btn-sm" id="tl-btn-plan" onclick="document.getElementById('plan-inp').click()" style="display:none;background:#c0392b;color:#fff">📐 Cargar plan de trabajo</button>
       <input type="file" id="plan-inp" accept="application/pdf" style="display:none" onchange="handlePlanPDF(this)">
       <button class="btn-sm btn-green" id="tl-btn-ev" onclick="openEvModal(null)" style="display:none">+ Evento</button>
+      <button class="btn-sm" id="tl-btn-import-json" onclick="openImportJSON()" style="display:none;background:#856404;color:#fff" title="Pegar JSON analizado por Claude">📋 Pegar análisis</button>
     </div>
 
     <!-- legend -->
@@ -260,6 +260,44 @@ td.cat-name{padding:7px 9px;font-weight:700;color:#1a2535;font-size:11px;border-
     <div class="tb-scroll" id="tb-scroll"></div>
   </div>
 </div>
+</div>
+
+
+<!-- IMPORT JSON MODAL -->
+<div class="modal-bg" id="import-json-modal">
+  <div class="modal" style="width:520px;max-width:98vw">
+    <div class="mhd">
+      <div>
+        <h3>Pegar análisis de Claude</h3>
+        <div class="mhd-sub">Pegá el JSON que te dio Claude al analizar el PDF</div>
+      </div>
+      <button class="mx" onclick="closeImportJSON()">✕</button>
+    </div>
+    <div class="mbody">
+      <div style="background:#fffbe6;border:1px solid #ffe58f;border-radius:7px;padding:.6rem .9rem;margin-bottom:.85rem;font-size:11px;color:#856404;line-height:1.6">
+        <strong>¿Cómo usarlo?</strong><br>
+        1. Subí el PDF del programa de seguridad o plan de trabajo <strong>acá en el chat de Claude</strong><br>
+        2. Pedile: <em>"Analizá este programa de seguridad y dame el JSON de eventos"</em><br>
+        3. Copiá el JSON que te responde y pegalo abajo
+      </div>
+      <div class="field">
+        <label>Tipo de documento</label>
+        <select id="import-json-tipo" style="width:100%;border:1px solid #d0d4db;border-radius:6px;padding:7px 10px;font-size:12px">
+          <option value="ps">Programa de Seguridad (etapas + capacitaciones + inspecciones)</option>
+          <option value="plan">Plan de trabajo de arquitectura (etapas constructivas)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>JSON del análisis</label>
+        <textarea id="import-json-text" style="width:100%;height:200px;border:1px solid #d0d4db;border-radius:6px;padding:8px 10px;font-size:11px;font-family:monospace;resize:vertical" placeholder='{"obra_nombre":"...","eventos":[...]}'></textarea>
+      </div>
+      <div id="import-json-error" style="color:#c0392b;font-size:11px;margin-top:4px;display:none"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn-cancel" onclick="closeImportJSON()">Cancelar</button>
+      <button class="btn-save" onclick="procesarImportJSON()">Importar eventos</button>
+    </div>
+  </div>
 </div>
 
 <!-- CHECKLIST MODAL -->
@@ -449,113 +487,69 @@ const OBRAS_DEFAULT=[
   }
 ];
 
-// ── PERSISTENCIA Google Drive ──
-const DRIVE_FILE_ID='16eMisu30gUjz3IhhLqlKZLQvE6s46wg1';
-const LS_KEY='hs_obras_v2'; // fallback local
-
-// ── OAuth token via Google Identity Services ──
-let _gToken=null;
+// ── PERSISTENCIA Supabase ──
+const SB_URL='https://aqbctspklwtbrjcwgdsl.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxYmN0c3BrbHd0YnJqY3dnZHNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTMzMDksImV4cCI6MjA5ODA2OTMwOX0.EJYaNnj-48vfDsja4n3qTojhByPONDUpMt97pZwtzZw';
+const LS_KEY='hs_obras_v2';
 let _saveTimer=null;
 
-function getToken(){
-  return new Promise((resolve,reject)=>{
-    if(_gToken&&_gToken.expires>Date.now()){resolve(_gToken.token);return;}
-    if(!window.google||!window.google.accounts){reject(new Error('GIS no cargado'));return;}
-    const client=google.accounts.oauth2.initTokenClient({
-      client_id:'264377119381-07sjif4q11fkbbf100fsrdu5rtrjq88t.apps.googleusercontent.com',
-      scope:'https://www.googleapis.com/auth/drive.file',
-      prompt:'',
-      callback:(resp)=>{
-        if(resp.error){reject(new Error(resp.error));return;}
-        _gToken={token:resp.access_token,expires:Date.now()+(resp.expires_in-60)*1000};
-        resolve(_gToken.token);
-      }
-    });
-    client.requestAccessToken({prompt:''});
-  });
-}
-
-// ── Save to Drive (debounced 2s) ──
+// ── Guardar en Supabase (debounced 2s) ──
 function _saveData(){
-  // Always save locally as fallback
+  // Guardar localmente de inmediato como fallback
   try{
     const payload=JSON.parse(JSON.stringify(obras));
-    payload.forEach(o=>{if(o.archivos)o.archivos=o.archivos.map(f=>({name:f.name,size:f.size,fecha:f.fecha}));});
+    payload.forEach(o=>{if(o.archivos)o.archivos=o.archivos.map(f=>({name:f.name,size:f.size,fecha:f.fecha,tipo:f.tipo,dataUrl:f.dataUrl||null}));});
     localStorage.setItem(LS_KEY,JSON.stringify(payload));
   }catch(e){}
-  // Debounce Drive save
+  // Debounce Supabase save 2s
   if(_saveTimer)clearTimeout(_saveTimer);
-  _saveTimer=setTimeout(()=>_saveToDrive(),1500);
+  _saveTimer=setTimeout(()=>_saveToSupabase(),2000);
 }
 
-async function _saveToDrive(){
+async function _saveToSupabase(){
   const ind=document.getElementById('save-indicator');
   try{
     const payload=JSON.parse(JSON.stringify(obras));
-    payload.forEach(o=>{if(o.archivos)o.archivos=o.archivos.map(f=>({name:f.name,size:f.size,fecha:f.fecha}));});
-    const body=JSON.stringify({obras:payload,version:1,lastSaved:new Date().toISOString()});
-    // Use multipart upload to update existing file
-    const boundary='bound'+Date.now();
-    const multipart=[
-      '--'+boundary,
-      'Content-Type: application/json; charset=UTF-8',
-      '',
-      JSON.stringify({name:'hs_obras_data.json',mimeType:'application/json'}),
-      '--'+boundary,
-      'Content-Type: application/json',
-      '',
-      body,
-      '--'+boundary+'--'
-    ].join('\r\n');
-    // Try with stored token first, then fetch new one
-    let token=(_gToken&&_gToken.expires>Date.now())?_gToken.token:null;
-    if(!token){
-      // Fall back: try to get token silently via GIS prompt=none
-      // If GIS not available, skip Drive save
-      if(!window.google||!window.google.accounts){
-        if(ind){ind.textContent='✓ Local (Drive no disponible)';ind.style.color='#d48806';ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},3000);}
-        return;
-      }
-      try{token=await getToken();}catch(e){
-        if(ind){ind.textContent='⚠ Guardado local (Drive requiere login)';ind.style.color='#d48806';ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},4000);}
-        return;
-      }
-    }
-    const resp=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${DRIVE_FILE_ID}?uploadType=multipart`,{
+    // Guardar archivos con dataUrl en Supabase (base64)
+    const resp=await fetch(SB_URL+'/rest/v1/obras_data?id=eq.main',{
       method:'PATCH',
-      headers:{'Authorization':'Bearer '+token,'Content-Type':'multipart/related; boundary='+boundary},
-      body:multipart
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':SB_KEY,
+        'Authorization':'Bearer '+SB_KEY,
+        'Prefer':'return=minimal'
+      },
+      body:JSON.stringify({data:{obras:payload},updated_at:new Date().toISOString()})
     });
-    if(!resp.ok)throw new Error('HTTP '+resp.status);
-    if(ind){ind.textContent='☁ Guardado en Drive';ind.style.color='#1a6b2e';ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},2500);}
+    if(!resp.ok){
+      const err=await resp.text();
+      throw new Error('HTTP '+resp.status+': '+err);
+    }
+    if(ind){ind.textContent='☁ Guardado en la nube';ind.style.color='#1a6b2e';ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},2500);}
   }catch(e){
-    console.warn('Drive save error:',e);
-    if(ind){ind.textContent='✓ Guardado local';ind.style.color='#d48806';ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},3000);}
+    console.warn('Supabase save error:',e);
+    if(ind){ind.textContent='✓ Guardado local';ind.style.color='#856404';ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},2500);}
   }
 }
 
-// ── Load from Drive on startup ──
-async function _loadFromDrive(){
+// ── Cargar desde Supabase ──
+async function _loadFromSupabase(){
   try{
-    let token=(_gToken&&_gToken.expires>Date.now())?_gToken.token:null;
-    if(!token){
-      if(!window.google||!window.google.accounts)return null;
-      token=await getToken();
-    }
-    const resp=await fetch(`https://www.googleapis.com/drive/v3/files/${DRIVE_FILE_ID}?alt=media&${Date.now()}`,{
-      headers:{'Authorization':'Bearer '+token,'Cache-Control':'no-cache'}
+    const resp=await fetch(SB_URL+'/rest/v1/obras_data?id=eq.main&select=data,updated_at',{
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
     });
     if(!resp.ok)return null;
-    const data=await resp.json();
-    if(!data.obras||!Array.isArray(data.obras))return null;
-    data.obras.forEach(o=>{
+    const rows=await resp.json();
+    if(!rows||!rows.length||!rows[0].data||!rows[0].data.obras)return null;
+    const parsed=rows[0].data.obras;
+    parsed.forEach(o=>{
       if(!o.eventos)o.eventos=[];
       if(!o.relevamientos)o.relevamientos={};
       if(!o.archivos)o.archivos=[];
       if(!o.color)o.color=COLORS[o.id%COLORS.length];
     });
-    return data.obras;
-  }catch(e){console.warn('Drive load error:',e);return null;}
+    return parsed;
+  }catch(e){console.warn('Supabase load error:',e);return null;}
 }
 
 function loadData(){
@@ -627,7 +621,7 @@ function renderTL(){
   if(!obra){wrap.innerHTML='<div class="no-obra"><div class="ni">🏗️</div><p>Seleccioná una obra</p></div>';return;}
   document.getElementById('tl-titulo').textContent=obra.nombre;
   document.getElementById('tl-meta').textContent=[obra.inicio&&obra.fin?`${fmtD(obra.inicio)} → ${fmtD(obra.fin)}`:'Sin fechas',obra.art,obra.tecnico].filter(Boolean).join(' · ');
-  ['tl-btn-edit','tl-btn-pdf','tl-btn-plan','tl-btn-ev'].forEach(id=>document.getElementById(id).style.display='');
+  ['tl-btn-edit','tl-btn-pdf','tl-btn-plan','tl-btn-ev','tl-btn-import-json'].forEach(id=>document.getElementById(id).style.display='');
 
   if(!obra.inicio||!obra.fin){
     wrap.innerHTML='<div id="ai-s"></div><div class="no-obra"><p>Definí las fechas de la obra para ver la línea de tiempo.</p></div>';return;
@@ -817,11 +811,11 @@ function guardarObra(){
   const n=document.getElementById('om-nombre').value.trim();if(!n){alert('Ingresá un nombre.');return;}
   if(editObra){const o=obras.find(x=>x.id===activeId);o.nombre=n;o.inicio=document.getElementById('om-ini').value;o.fin=document.getElementById('om-fin').value;o.art=document.getElementById('om-art').value;o.tecnico=document.getElementById('om-tec').value;}
   else{_id++;obras.push({id:_id,nombre:n,inicio:document.getElementById('om-ini').value,fin:document.getElementById('om-fin').value,art:document.getElementById('om-art').value,tecnico:document.getElementById('om-tec').value,color:COLORS[_id%COLORS.length],eventos:[],relevamientos:{}});activeId=_id;}
-  closeOM();renderSB();renderTL();saveData();
+  closeOM();renderSB();renderTL();_saveData();
 }
 function elimObra(){
   const o=obras.find(x=>x.id===activeId);if(!confirm(`¿Eliminar "${o.nombre}"?`))return;
-  obras=obras.filter(x=>x.id!==activeId);activeId=obras.length?obras[0].id:null;closeOM();renderSB();saveData();
+  obras=obras.filter(x=>x.id!==activeId);activeId=obras.length?obras[0].id:null;closeOM();renderSB();_saveData();
   if(activeId)renderTL();else{document.getElementById('tl-titulo').textContent='Seleccioná una obra';document.getElementById('tl-meta').textContent='';['tl-btn-edit','tl-btn-pdf','tl-btn-ev'].forEach(id=>document.getElementById(id).style.display='none');document.getElementById('tl-wrap').innerHTML='<div class="no-obra"><div class="ni">🏗️</div><p>Seleccioná una obra</p></div>';}
 }
 
@@ -852,122 +846,48 @@ function guardarEv(){
 function elimEv(){if(!confirm('¿Eliminar?'))return;obras.find(o=>o.id===activeId).eventos.splice(evIdx,1);closeEV();_saveData();showSaveOK();renderTL();}
 
 // ══ PDF/IA ══
-async function handlePDF(input){
+function handlePDF(input){
+  // PDF upload stored as file attachment only - analysis done via Claude chat
   const file=input.files[0];if(!file)return;
-  const obra=obras.find(o=>o.id===activeId);if(!obra)return;input.value='';
+  const obra=obras.find(o=>o.id===activeId);if(!obra)return;
+  input.value='';
   const sw=document.getElementById('ai-s');
-  sw.innerHTML=`<div class="ai-bar"><div class="ai-spin"></div><span>Leyendo el programa de seguridad con IA (Gemini)…</span></div>`;
-  const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.onerror=()=>rej(new Error('Error'));r.readAsDataURL(file);});
-  const prompt=`Analizá este Programa de Seguridad (construcción argentina, Dec 911/96) y extraé todos los eventos. Respondé SOLO con JSON válido sin markdown ni texto extra:
-{"obra_nombre":"...","obra_inicio":"YYYY-MM-DD","obra_fin":"YYYY-MM-DD","art":"...","tecnico":"...","eventos":[{"type":"etapa|cap|insp","desc":"...","inicio":"YYYY-MM-DD","fin":"YYYY-MM-DD","obs":""}]}
-Reglas: type=etapa para etapas constructivas con rango de fechas, type=cap para capacitaciones (un solo día), type=insp para inspecciones HyS. Para eventos de un solo día usá la misma fecha en inicio y fin. Si no hay día exacto usá el día 1 del mes. Extraé TODAS las capacitaciones del cronograma mensual y TODAS las etapas constructivas con sus fechas de inicio y fin.`;
-  try{
-    const body={
-      contents:[{
-        parts:[
-          {inline_data:{mime_type:'application/pdf',data:b64}},
-          {text:prompt}
-        ]
-      }],
-      generationConfig:{temperature:0,maxOutputTokens:4096}
-    };
-    const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AQ.Ab8RN6J4y-T5x1Xaq9Gc8skX-oPsAIsTkOuWUJrKf023gc36uw',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(body)
-    });
-    const data=await resp.json();
-    if(!resp.ok)throw new Error(data.error?.message||'Error Gemini API: '+resp.status);
-    const raw=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    if(!raw)throw new Error('Gemini no devolvió texto');
-    const clean=raw.replace(/```json|```/g,'').trim();
-    const parsed=JSON.parse(clean);
-    if(parsed.obra_nombre)obra.nombre=parsed.obra_nombre;
-    if(parsed.obra_inicio)obra.inicio=parsed.obra_inicio;
-    if(parsed.obra_fin)obra.fin=parsed.obra_fin;
-    if(parsed.art)obra.art=parsed.art;
-    if(parsed.tecnico)obra.tecnico=parsed.tecnico;
-    if(Array.isArray(parsed.eventos)){
-      const seen=new Set(obra.eventos.map(e=>e.desc+e.inicio));
-      parsed.eventos.forEach(ev=>{
-        const k=ev.desc+ev.inicio;
-        if(!seen.has(k)){obra.eventos.push({type:ev.type||'etapa',desc:ev.desc||'',inicio:ev.inicio||'',fin:ev.fin||ev.inicio||'',obs:ev.obs||''});seen.add(k);}
-      });
-    }
-    const n=parsed.eventos?.length||0;
-    sw.innerHTML=`<div class="ai-bar done">✓ ${n} eventos extraídos del programa de seguridad.</div>`;
-    setTimeout(()=>{try{sw.innerHTML='';}catch(e){}},4000);
-    renderSB();renderTL();_saveData();showSaveOK();
-  }catch(err){
-    sw.innerHTML=`<div class="ai-bar err">✗ Error: ${err.message}</div>`;
-  }
+  // Store file reference in obra
+  const reader=new FileReader();
+  reader.onload=e=>{
+    if(!obra.archivos)obra.archivos=[];
+    // Remove previous PS file
+    obra.archivos=obra.archivos.filter(f=>f.tipo!=='ps');
+    obra.archivos.push({name:file.name,size:file.size,fecha:new Date().toLocaleDateString('es-AR'),tipo:'ps',dataUrl:e.target.result});
+    _saveData();showSaveOK();
+    sw.innerHTML='<div class="ai-bar done">✓ Programa de Seguridad guardado: '+file.name+'<br><span style="font-size:10px;opacity:.8">Para extraer los eventos, subí el PDF en el chat de Claude y pedí el análisis.</span></div>';
+    setTimeout(()=>{try{sw.innerHTML='';}catch(e){}},6000);
+    renderTL();
+  };
+  reader.readAsDataURL(file);
 }
 
-
 // ── PLAN DE TRABAJO (ARQUITECTURA) ──
-async function handlePlanPDF(input){
+function handlePlanPDF(input){
   const file=input.files[0];if(!file)return;
-  const obra=obras.find(o=>o.id===activeId);if(!obra)return;input.value='';
+  const obra=obras.find(o=>o.id===activeId);if(!obra)return;
+  input.value='';
   const sw=document.getElementById('ai-s');
-  sw.innerHTML='<div class="ai-bar"><div class="ai-spin"></div><span>Leyendo el plan de trabajo de arquitectura…</span></div>';
-  const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.onerror=()=>rej(new Error('Error'));r.readAsDataURL(file);});
-  const prompt=`Este es un plan de trabajo (cronograma Gantt) de arquitectura. Extraé las etapas principales con fechas. Responde SOLO JSON sin markdown: {"obra_inicio":"YYYY-MM-DD","obra_fin":"YYYY-MM-DD","etapas":[{"desc":"nombre","inicio":"YYYY-MM-DD","fin":"YYYY-MM-DD","grupo":"fase"}]}. Para quincena 1 de un mes usa dia 1, quincena 2 usa dia 15. Maximo 40 etapas principales.`;
-  try{
-    const body={contents:[{parts:[{inline_data:{mime_type:'application/pdf',data:b64}},{text:prompt}]}],generationConfig:{temperature:0,maxOutputTokens:4096}};
-    const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AQ.Ab8RN6J4y-T5x1Xaq9Gc8skX-oPsAIsTkOuWUJrKf023gc36uw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const data=await resp.json();
-    if(!resp.ok)throw new Error(data.error?.message||'Error Gemini: '+resp.status);
-    const raw=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    if(!raw)throw new Error('Sin respuesta de Gemini');
-    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
-    if(parsed.obra_inicio&&!obra.inicio)obra.inicio=parsed.obra_inicio;
-    if(parsed.obra_fin&&!obra.fin)obra.fin=parsed.obra_fin;
-    obra.eventos=obra.eventos.filter(e=>e.type!=='plan');
-    let added=0;
-    if(Array.isArray(parsed.etapas)){
-      parsed.etapas.forEach(item=>{
-        if(item.desc&&item.inicio&&item.fin){
-          obra.eventos.push({type:'plan',desc:item.desc+(item.grupo?' ('+item.grupo+')':''),inicio:item.inicio,fin:item.fin,obs:item.grupo||'Plan arquitectura'});
-          added++;
-        }
-      });
-    }
-    sw.innerHTML='<div class="ai-bar done">✓ '+added+' etapas del plan de trabajo cargadas. Aparecen en rojo sobre el Gantt.</div>';
-    setTimeout(()=>{try{sw.innerHTML='';}catch(e){}},5000);
-    renderSB();renderTL();_saveData();showSaveOK();
-  }catch(err){
-    console.error(err);
-    sw.innerHTML='<div class="ai-bar err">✗ Error: '+err.message+'</div>';
-  }
+  const reader=new FileReader();
+  reader.onload=e=>{
+    if(!obra.archivos)obra.archivos=[];
+    obra.archivos=obra.archivos.filter(f=>f.tipo!=='plan');
+    obra.archivos.push({name:file.name,size:file.size,fecha:new Date().toLocaleDateString('es-AR'),tipo:'plan',dataUrl:e.target.result});
+    _saveData();showSaveOK();
+    sw.innerHTML='<div class="ai-bar done">✓ Plan de trabajo guardado: '+file.name+'<br><span style="font-size:10px;opacity:.8">Para extraer las etapas, subí el PDF en el chat de Claude y pedí el análisis.</span></div>';
+    setTimeout(()=>{try{sw.innerHTML='';}catch(e){}},6000);
+    renderTL();
+  };
+  reader.readAsDataURL(file);
 }
 
 // ── EXPORT / IMPORT ──
-function connectDrive(){
-  if(!window.google||!window.google.accounts){
-    alert('Cargando Google Identity Services... intentá en unos segundos.');
-    return;
-  }
-  getToken().then(token=>{
-    _gToken={token,expires:Date.now()+3540000};
-    const btn=document.getElementById('btn-drive');
-    if(btn){btn.textContent='☁ Drive conectado ✓';btn.style.background='#1a6b2e';btn.style.cursor='default';}
-    const ind=document.getElementById('save-indicator');
-    if(ind){ind.textContent='☁ Drive conectado — guardado automático activo';ind.style.color='#1a6b2e';ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},4000);}
-    // Load latest data from Drive after connecting
-    _loadFromDrive().then(data=>{
-      if(data&&data.length>0){
-        obras=data;_id=Math.max(...obras.map(o=>o.id),4);
-        try{localStorage.setItem(LS_KEY,JSON.stringify(obras));}catch(e){}
-        renderSB();
-        const lastId=parseInt(localStorage.getItem('hs_last_obra')||'0');
-        const initObra=obras.find(o=>o.id===lastId)||obras[0];
-        if(initObra)selObra(initObra.id);
-      }
-    });
-  }).catch(e=>{
-    alert('No se pudo conectar con Drive: '+e.message);
-  });
-}
+
 
 function exportData(){
   const blob=new Blob([JSON.stringify(obras,null,2)],{type:'application/json'});
@@ -1006,20 +926,81 @@ function showSaveOK(msg){
 }
 
 
+
+// ── IMPORT JSON FROM CLAUDE ──
+function openImportJSON(){
+  document.getElementById('import-json-text').value='';
+  document.getElementById('import-json-error').style.display='none';
+  document.getElementById('import-json-modal').classList.add('open');
+}
+function closeImportJSON(){
+  document.getElementById('import-json-modal').classList.remove('open');
+}
+function procesarImportJSON(){
+  const raw=document.getElementById('import-json-text').value.trim();
+  const tipo=document.getElementById('import-json-tipo').value;
+  const errEl=document.getElementById('import-json-error');
+  const obra=obras.find(o=>o.id===activeId);
+  if(!obra){closeImportJSON();return;}
+  try{
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    let added=0;
+    if(tipo==='ps'){
+      // Programa de Seguridad format
+      if(parsed.obra_nombre)obra.nombre=parsed.obra_nombre;
+      if(parsed.obra_inicio)obra.inicio=parsed.obra_inicio;
+      if(parsed.obra_fin)obra.fin=parsed.obra_fin;
+      if(parsed.art)obra.art=parsed.art;
+      if(parsed.tecnico)obra.tecnico=parsed.tecnico;
+      const eventos=parsed.eventos||[];
+      const seen=new Set(obra.eventos.map(e=>e.desc+e.inicio));
+      eventos.forEach(ev=>{
+        const k=ev.desc+ev.inicio;
+        if(!seen.has(k)){
+          obra.eventos.push({type:ev.type||'etapa',desc:ev.desc||'',inicio:ev.inicio||'',fin:ev.fin||ev.inicio||'',obs:ev.obs||''});
+          seen.add(k);added++;
+        }
+      });
+    } else {
+      // Plan de trabajo format
+      if(parsed.obra_inicio&&!obra.inicio)obra.inicio=parsed.obra_inicio;
+      if(parsed.obra_fin&&!obra.fin)obra.fin=parsed.obra_fin;
+      obra.eventos=obra.eventos.filter(e=>e.type!=='plan');
+      const etapas=parsed.etapas||parsed.eventos||[];
+      etapas.forEach(item=>{
+        if(item.desc&&item.inicio&&item.fin){
+          obra.eventos.push({type:'plan',desc:item.desc+(item.grupo?' ('+item.grupo+')':''),inicio:item.inicio,fin:item.fin,obs:item.grupo||'Plan arquitectura'});
+          added++;
+        }
+      });
+    }
+    closeImportJSON();
+    _saveData();showSaveOK();
+    renderSB();renderTL();
+    const sw=document.getElementById('ai-s');
+    if(sw){sw.innerHTML='<div class="ai-bar done">✓ '+added+' eventos importados correctamente.</div>';setTimeout(()=>{try{sw.innerHTML='';}catch(e){}},4000);}
+  }catch(err){
+    errEl.textContent='JSON inválido: '+err.message+'. Revisá que hayas copiado el JSON completo.';
+    errEl.style.display='block';
+  }
+}
+document.getElementById('import-json-modal').addEventListener('click',function(e){if(e.target===this)closeImportJSON();});
+
 ['chk-modal','obra-modal','ev-modal'].forEach(id=>{document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});});
-// ── INICIO: intentar cargar desde Drive ──
+// ── INICIO: cargar desde Supabase ──
 (async()=>{
   const ind=document.getElementById('save-indicator');
-  if(ind){ind.textContent='☁ Conectando con Drive...';ind.style.color='#1a4fa0';ind.style.opacity='1';}
-  const driveData=await _loadFromDrive();
-  if(driveData&&driveData.length>0){
-    obras=driveData;
+  if(ind){ind.textContent='☁ Cargando datos...';ind.style.color='#1a4fa0';ind.style.opacity='1';}
+  const sbData=await _loadFromSupabase();
+  if(sbData&&sbData.length>0){
+    // Comparar con local: usar el más reciente
+    obras=sbData;
     _id=Math.max(...obras.map(o=>o.id),4);
-    // sync to local as backup
     try{localStorage.setItem(LS_KEY,JSON.stringify(obras));}catch(e){}
-    if(ind){ind.textContent='☁ Datos cargados desde Drive';ind.style.color='#1a6b2e';ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},3000);}
+    if(ind){ind.textContent='☁ Datos sincronizados';ind.style.color='#1a6b2e';ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},2500);}
   }else{
-    if(ind){ind.textContent='✓ Datos locales cargados';ind.style.color='#888';ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},2500);}
+    if(ind){ind.textContent='✓ Datos locales';ind.style.color='#888';ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},2000);}
   }
   renderSB();
   const _lastId=parseInt(localStorage.getItem('hs_last_obra')||'0');
