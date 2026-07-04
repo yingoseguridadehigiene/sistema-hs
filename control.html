@@ -284,16 +284,7 @@ function renderTablero() {
     const obra = obrasData[cfg.id];
     const nombre = obra?.nombre || cfg.nombre;
 
-    if (!obra) {
-      return `<div style="border-left:4px solid ${cfg.color};background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-        <div style="font-size:15px;font-weight:800;color:#1a2332">
-          <a href="${cfg.file}" target="_blank" style="color:#1a2332;text-decoration:none">${nombre} ↗</a>
-        </div>
-        <div style="font-size:11px;color:#bbb;margin-top:4px">Sin datos cargados</div>
-      </div>`;
-    }
-
-    const rel = obra.relevamientos?.[wk];
+    const rel = obra?.relevamientos?.[wk];
     let okC=0, attC=0, probC=0, nrC=0;
     CATS.forEach(cat => {
       const est = catEstado(rel, cat.key);
@@ -312,7 +303,8 @@ function renderTablero() {
     return `<div style="border-left:4px solid ${cfg.color};background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
       <div style="margin-bottom:10px">
         <a href="${cfg.file}" target="_blank" style="font-size:15px;font-weight:800;color:#1a2332;text-decoration:none">${nombre} ↗</a>
-        <span style="font-size:10px;color:#888;margin-left:8px">${obra.dir||''}</span>
+        <span style="font-size:10px;color:#888;margin-left:8px">${obra?.dir||''}</span>
+        ${!obra?'<span style="font-size:10px;color:#bbb;margin-left:8px">Sin datos en Supabase aún</span>':''}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         ${pill(okC,   'OK',               '#1a6b2e','#eef6f0')}
