@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HyS — Control General de Obras</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f7;color:#1a2332;min-height:100vh}
+
+/* ── TOP NAV ── */
+.nav{background:#1a2332;padding:0 24px;display:flex;align-items:center;gap:16px;height:52px;position:sticky;top:0;z-index:50}
+.nav-logo{font-size:14px;font-weight:800;color:#fff;letter-spacing:.02em}
+.nav-logo span{color:#4a9fc8;font-size:10px;font-weight:400;margin-left:6px}
+.nav-tab{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;color:#8aa0bc;border:none;background:none;transition:all .15s}
+.nav-tab:hover{color:#fff;background:#243048}
+.nav-tab.active{color:#fff;background:#1a4fa0}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.sync-btn{background:#243048;border:1px solid #3a5068;border-radius:6px;padding:5px 12px;font-size:11px;color:#6a9fc8;cursor:pointer;font-weight:600}
+.sync-btn:hover{background:#2d4060}
+.sync-ind{font-size:10px;color:#4a7a50}
+
+/* ── VIEWS ── */
+.view{display:none;padding:20px 24px}
+.view.active{display:block}
+
+/* ── SECTION HEADER ── */
+.sec-title{font-size:18px;font-weight:700;color:#1a2332;margin-bottom:4px}
+.sec-sub{font-size:12px;color:#6a8aaa;margin-bottom:20px}
+
+/* ── CARDS GRID ── */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:24px}
+.obra-card{background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);overflow:hidden;border:1px solid #e0e4ec}
+.card-head{padding:14px 16px 10px;display:flex;align-items:flex-start;gap:10px;border-bottom:1px solid #f0f2f6}
+.card-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0;margin-top:2px}
+.card-title{font-size:13px;font-weight:700;color:#1a2332;line-height:1.3}
+.card-sub{font-size:10px;color:#888;margin-top:2px}
+.card-link{margin-left:auto;font-size:10px;color:#1a4fa0;text-decoration:none;border:1px solid #c0d0e8;border-radius:5px;padding:3px 8px;white-space:nowrap;flex-shrink:0}
+.card-link:hover{background:#eef2fb}
+.card-body{padding:12px 16px}
+.card-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f7f8fa}
+.card-row:last-child{border-bottom:none}
+.card-row-label{font-size:10px;color:#888}
+.card-row-val{font-size:11px;font-weight:600;color:#1a2332}
+.card-footer{padding:8px 16px;background:#f7f8fa;display:flex;gap:5px;flex-wrap:wrap}
+.cat-pill{border-radius:4px;padding:3px 7px;font-size:9px;font-weight:700;cursor:default}
+.cat-pill.ok{background:#d4edda;color:#1a6b2e}
+.cat-pill.att{background:#fff3cd;color:#856404}
+.cat-pill.prob{background:#fde8e8;color:#c0392b}
+.cat-pill.nr{background:#ede9f6;color:#7c3fa0}
+.cat-pill.nd{background:#f0f2f6;color:#aaa}
+.no-data{color:#bbb;font-size:11px;font-style:italic;padding:8px 0}
+
+/* ── ESTADO GLOBAL ── */
+.estado-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+.estado-card{background:#fff;border-radius:10px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06);border:1px solid #e0e4ec}
+.estado-n{font-size:28px;font-weight:800;line-height:1}
+.estado-l{font-size:11px;color:#888;margin-top:5px}
+
+/* ── GANTT COMPARATIVO ── */
+.gantt-comp{background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);overflow:hidden;margin-bottom:24px;border:1px solid #e0e4ec}
+.gc-head{padding:14px 16px;border-bottom:1px solid #f0f2f6;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.gc-title{font-size:13px;font-weight:700;color:#1a2332}
+.gc-leg{display:flex;align-items:center;gap:4px;font-size:10px;color:#666}
+.gc-pill{width:12px;height:8px;border-radius:2px}
+.gc-table{overflow-x:auto}
+.gc-inner{min-width:900px}
+.gc-months{display:flex;padding-left:180px;background:#f7f8fa;border-bottom:1px solid #e8eaf0}
+.gc-month{flex:1;text-align:center;font-size:9px;font-weight:700;color:#888;padding:4px 2px;border-right:1px solid #e8eaf0}
+.gc-row{display:flex;align-items:center;border-bottom:1px solid #f3f4f7;height:34px}
+.gc-row:last-child{border-bottom:none}
+.gc-label{width:180px;min-width:180px;padding:0 10px;font-size:11px;font-weight:700;color:#1a2332;display:flex;align-items:center;gap:6px;border-right:1px solid #eee;background:#fafbfc;height:100%;flex-shrink:0}
+.gc-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.gc-bars{flex:1;position:relative;height:34px}
+.gc-bar{position:absolute;top:10px;height:14px;border-radius:4px;display:flex;align-items:center;padding:0 5px;font-size:9px;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden}
+.gc-today{position:absolute;top:0;bottom:0;width:2px;background:rgba(220,50,50,.5);z-index:2;pointer-events:none}
+.gc-srv-bar{position:absolute;top:16px;height:6px;border-radius:3px;opacity:.7}
+
+/* ── SERVICIOS VIEW ── */
+.srv-table{background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);overflow:hidden;border:1px solid #e0e4ec}
+.srv-table table{width:100%;border-collapse:collapse}
+.srv-table th{padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#555;background:#f7f8fa;border-bottom:2px solid #e0e4ec;white-space:nowrap}
+.srv-table td{padding:10px 14px;font-size:11px;border-bottom:1px solid #f0f2f6;vertical-align:middle}
+.srv-table tr:last-child td{border-bottom:none}
+.srv-table tr:hover td{background:#fafbff}
+.srv-tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700}
+.srv-ok{background:#d4edda;color:#1a6b2e}
+.srv-warn{background:#fde8e8;color:#c0392b}
+.srv-nd{background:#f0f2f6;color:#999}
+
+/* ── LOADING ── */
+.loading{display:flex;align-items:center;justify-content:center;padding:60px;gap:12px;color:#888;font-size:13px}
+.spin{width:20px;height:20px;border:3px solid #e0e4ec;border-top-color:#1a4fa0;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.last-sync{font-size:10px;color:#6a8aaa}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-logo">Sistema HyS <span>Control General</span></div>
+  <button class="nav-tab active" onclick="setView('tablero')">📊 Tablero</button>
+  <button class="nav-tab" onclick="setView('gantt')">📅 Gantt comparativo</button>
+  <button class="nav-tab" onclick="setView('servicios')">🔧 Servicios</button>
+  <button class="nav-tab" onclick="setView('costos')">💰 Centro de costos</button>
+  <div class="nav-right">
+    <span class="sync-ind" id="sync-ind">—</span>
+    <button class="sync-btn" onclick="syncAll()">↻ Actualizar</button>
+  </div>
+</div>
+
+<!-- TABLERO -->
+<div class="view active" id="view-tablero">
+  <div class="sec-title">Estado de obras — semana actual</div>
+  <div class="sec-sub" id="tablero-fecha">Cargando...</div>
+  <div class="estado-grid" id="estado-grid"></div>
+  <div class="cards-grid" id="cards-grid">
+    <div class="loading"><div class="spin"></div>Cargando datos de obras...</div>
+  </div>
+</div>
+
+<!-- GANTT COMPARATIVO -->
+<div class="view" id="view-gantt">
+  <div class="sec-title">Línea de tiempo comparativa</div>
+  <div class="sec-sub">Todas las obras en el mismo eje de tiempo</div>
+  <div class="gantt-comp" id="gantt-comp">
+    <div class="loading"><div class="spin"></div>Cargando...</div>
+  </div>
+</div>
+
+<!-- SERVICIOS -->
+<div class="view" id="view-servicios">
+  <div class="sec-title">Servicios por obra</div>
+  <div class="sec-sub">Estado de servicios instalados esta semana</div>
+  <div class="srv-table" id="srv-table">
+    <div class="loading"><div class="spin"></div>Cargando...</div>
+  </div>
+</div>
+
+<!-- CENTRO DE COSTOS -->
+<div class="view" id="view-costos">
+  <div class="sec-title">💰 Centro de costos</div>
+  <div class="sec-sub">Precios unitarios por obra · análisis mensual y comparativo</div>
+
+  <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
+    <button class="nav-tab active" id="cc-tab-precios" onclick="setCostosView('precios')">⚙ Precios por obra</button>
+    <button class="nav-tab" id="cc-tab-analisis" onclick="setCostosView('analisis')">📊 Análisis por obra</button>
+    <button class="nav-tab" id="cc-tab-comparar" onclick="setCostosView('comparar')">⚖ Comparar obras</button>
+  </div>
+
+  <!-- PRECIOS POR OBRA -->
+  <div id="cc-view-precios">
+    <div class="sec-sub" style="margin-bottom:12px">Cargá los precios específicos de cada obra. Se guardan localmente en este navegador.</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+      <select id="cc-precios-obra-sel" onchange="renderPreciosObra()" style="border:1px solid #d0d4db;border-radius:7px;padding:7px 12px;font-size:12px"></select>
+      <select id="cc-precios-mes-sel" onchange="renderPreciosObra()" style="border:1px solid #d0d4db;border-radius:7px;padding:7px 12px;font-size:12px"></select>
+      <button class="sync-btn" style="background:#1a4fa0;color:#fff;border-color:#1a4fa0" onclick="guardarPrecios()">💾 Guardar precios</button>
+      <span id="cc-save-ind" class="last-sync"></span>
+    </div>
+    <div id="cc-precios-content"></div>
+  </div>
+
+  <!-- ANÁLISIS POR OBRA -->
+  <div id="cc-view-analisis" style="display:none">
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <select id="cc-obra-sel" onchange="renderAnalisisObra()" style="border:1px solid #d0d4db;border-radius:7px;padding:7px 12px;font-size:12px"></select>
+      <select id="cc-mes-sel" onchange="renderAnalisisObra()" style="border:1px solid #d0d4db;border-radius:7px;padding:7px 12px;font-size:12px"></select>
+    </div>
+    <div id="cc-analisis-content"></div>
+  </div>
+
+  <!-- COMPARAR ENTRE OBRAS -->
+  <div id="cc-view-comparar" style="display:none">
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+      <select id="cc-comp-mes-sel" onchange="renderComparar()" style="border:1px solid #d0d4db;border-radius:7px;padding:7px 12px;font-size:12px"></select>
+    </div>
+    <div id="cc-comparar-content"></div>
+  </div>
+</div></div>
+
+<script>
+// ── CONFIG ──
+const SB_URL='https://aqbctspklwtbrjcwgdsl.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxYmN0c3BrbHd0YnJqY3dnZHNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTMzMDksImV4cCI6MjA5ODA2OTMwOX0.EJYaNnj-48vfDsja4n3qTojhByPONDUpMt97pZwtzZw';
+
+const OBRAS_CONFIG = [
+  {id:'obra_foresta_alvear',     nombre:'Foresta Alvear',     color:'#1a4fa0', file:'obra_foresta_alvear.html'},
+  {id:'obra_foresta_pellegrini', nombre:'Foresta Pellegrini', color:'#1a6b2e', file:'obra_foresta_pellegrini.html'},
+  {id:'obra_terral_mar',         nombre:'Terral al Mar',      color:'#7c3fa0', file:'obra_terral_mar.html'},
+  {id:'obra_tortuguitas',        nombre:'C.C. Tortuguitas',   color:'#c0392b', file:'obra_tortuguitas.html'},
+  {id:'obra_miralagos',          nombre:'Miralagos',          color:'#d4880a', file:'obra_miralagos.html'},
+];
+
+const CATS = [
+  {key:'docs_hys',label:'Doc. HyS'},
+  {key:'docs_lab',label:'Doc. Laboral'},
+  {key:'maq',label:'Maquinaria'},
+  {key:'elec',label:'Eléctrica'},
+  {key:'epp',label:'EPP'},
+  {key:'altura',label:'Altura'},
+  {key:'orden',label:'Orden'},
+  {key:'servicios',label:'Servicios'},
+  {key:'perim',label:'Perimetral'},
+];
+
+// ── STATE ──
+let obrasData = {}; // id -> obra object
+let activeView = 'tablero';
+
+// ── NAV ──
+function setView(v) {
+  activeView = v;
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + v).classList.add('active');
+  renderView();
+}
+
+// ── UTILS ──
+function toD(s){return s?new Date(s+'T00:00:00'):null}
+function fmtD(s){if(!s)return'—';const[y,m,d]=s.split('-');return d+'/'+m+'/'+y;}
+function wkKey(date){
+  const dt=date?new Date(date+'T00:00:00'):new Date();
+  dt.setHours(0,0,0,0);dt.setDate(dt.getDate()-((dt.getDay()+6)%7));
+  const y=dt.getFullYear(),wn=Math.ceil(((dt-new Date(y,0,1))/86400000+1)/7);
+  return y+'-W'+String(wn).padStart(2,'0');
+}
+
+// ── LOAD FROM SUPABASE ──
+async function syncAll() {
+  const ind = document.getElementById('sync-ind');
+  ind.textContent = '↻ Cargando...';
+
+  const ids = OBRAS_CONFIG.map(o => o.id);
+  try {
+    const resp = await fetch(
+      SB_URL + '/rest/v1/obras_data?id=in.(' + ids.join(',') + ')&select=id,data,updated_at',
+      {headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY}}
+    );
+    const rows = await resp.json();
+    rows.forEach(row => {
+      if (row.data) obrasData[row.id] = row.data;
+    });
+    ind.textContent = '✓ ' + new Date().toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'});
+  } catch(e) {
+    ind.textContent = '⚠ Sin conexión';
+  }
+  renderView();
+}
+
+function renderView() {
+  if (activeView === 'tablero') renderTablero();
+  else if (activeView === 'gantt') renderGantt();
+  else if (activeView === 'servicios') renderServicios();
+}
+
+// ── TABLERO ──
+function catEstado(rel, catKey) {
+  if (!rel || !rel[catKey]) return 'nd';
+  if (rel[catKey]._noRelev) return 'nr';
+  const vals = Object.entries(rel[catKey])
+    .filter(([k]) => k !== '_obs' && k !== '_noRelev')
+    .map(([,v]) => v?.estado);
+  if (vals.includes('prob')) return 'prob';
+  if (vals.includes('att')) return 'att';
+  if (vals.some(v => v === 'ok')) return 'ok';
+  return 'nd';
+}
+
+function estadoLabel(e) {
+  return {ok:'Sin problemas', att:'Precaución', prob:'Problema', nr:'Sin relev.', nd:'—'}[e] || '—';
+}
+
+function renderTablero() {
+  const wk = wkKey();
+  const now = new Date();
+  document.getElementById('tablero-fecha').textContent =
+    'Semana ' + wk + ' · ' + now.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+
+  // Global counters
+  let totalOk=0, totalAtt=0, totalProb=0, totalNR=0, totalND=0;
+
+  const cardsHTML = OBRAS_CONFIG.map(cfg => {
+    const obra = obrasData[cfg.id];
+    if (!obra) {
+      return `<div class="obra-card">
+        <div class="card-head">
+          <div class="card-dot" style="background:${cfg.color}"></div>
+          <div><div class="card-title">${cfg.nombre}</div><div class="card-sub">Sin datos</div></div>
+          <a href="${cfg.file}" class="card-link" target="_blank">↗ Abrir obra</a>
+        </div>
+        <div class="card-body"><div class="no-data">No hay datos cargados aún</div></div>
+      </div>`;
+    }
+
+    const rel = obra.relevamientos?.[wk];
+    const cats = CATS.map(cat => {
+      const est = catEstado(rel, cat.key);
+      if (est === 'ok') totalOk++;
+      else if (est === 'att') totalAtt++;
+      else if (est === 'prob') totalProb++;
+      else if (est === 'nr') totalNR++;
+      else totalND++;
+      return `<span class="cat-pill ${est}" title="${cat.label}">${cat.label}</span>`;
+    }).join('');
+
+    const srv = obra.servicios?.[wk] || {};
+    const srvInfo = [
+      srv.banio_u ? `🚽 ${srv.banio_u}ud` : '',
+      srv.agua_b ? `💧 ${srv.agua_b}bid` : '',
+      srv.alarma_e && srv.alarma_e !== 'No instalada' ? `🚨 ${srv.alarma_e}` : '',
+    ].filter(Boolean).join(' · ') || '—';
+
+    const pct = obra.inicio && obra.fin ? Math.max(0, Math.min(100,
+      (new Date() - toD(obra.inicio)) / (toD(obra.fin) - toD(obra.inicio)) * 100
+    )).toFixed(0) : null;
+
+    return `<div class="obra-card">
+      <div class="card-head">
+        <div class="card-dot" style="background:${cfg.color}"></div>
+        <div>
+          <div class="card-title">${obra.nombre || cfg.nombre}</div>
+          <div class="card-sub">${obra.dir || ''} ${obra.art ? '· ' + obra.art : ''}</div>
+        </div>
+        <a href="${cfg.file}" class="card-link" target="_blank">↗ Abrir</a>
+      </div>
+      <div class="card-body">
+        <div class="card-row"><span class="card-row-label">DO</span><span class="card-row-val">${obra.do||'—'}</span></div>
+        <div class="card-row"><span class="card-row-label">AO</span><span class="card-row-val">${obra.ao||'—'}</span></div>
+        <div class="card-row"><span class="card-row-label">Técnico HyS</span><span class="card-row-val">${obra.tecnico||'—'}</span></div>
+        <div class="card-row"><span class="card-row-label">Período</span><span class="card-row-val">${fmtD(obra.inicio)} → ${fmtD(obra.fin)}</span></div>
+        ${pct !== null ? `<div class="card-row"><span class="card-row-label">Avance estimado</span>
+          <span class="card-row-val">${pct}%
+            <span style="display:inline-block;width:60px;height:5px;background:#f0f2f6;border-radius:3px;margin-left:5px;vertical-align:middle">
+              <span style="display:block;width:${pct}%;height:100%;background:${cfg.color};border-radius:3px"></span>
+            </span>
+          </span></div>` : ''}
+        <div class="card-row"><span class="card-row-label">🔧 Servicios semana</span><span class="card-row-val">${srvInfo}</span></div>
+      </div>
+      <div class="card-footer">${cats}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('cards-grid').innerHTML = cardsHTML;
+
+  // Estado global summary
+  document.getElementById('estado-grid').innerHTML = `
+    <div class="estado-card"><div class="estado-n" style="color:#1a6b2e">${totalOk}</div><div class="estado-l">Categorías OK</div></div>
+    <div class="estado-card"><div class="estado-n" style="color:#856404">${totalAtt}</div><div class="estado-l">Precaución</div></div>
+    <div class="estado-card"><div class="estado-n" style="color:#c0392b">${totalProb}</div><div class="estado-l">Con problemas</div></div>
+    <div class="estado-card"><div class="estado-n" style="color:#7c3fa0">${totalNR}</div><div class="estado-l">Sin relevamiento</div></div>
+    <div class="estado-card"><div class="estado-n">${OBRAS_CONFIG.length}</div><div class="estado-l">Obras activas</div></div>
+  `;
+}
+
+// ── GANTT COMPARATIVO ──
+function renderGantt() {
+  // Find global date range
+  let minDate = null, maxDate = null;
+  OBRAS_CONFIG.forEach(cfg => {
+    const obra = obrasData[cfg.id];
+    if (!obra || !obra.inicio || !obra.fin) return;
+    const s = toD(obra.inicio), e = toD(obra.fin);
+    if (!minDate || s < minDate) minDate = s;
+    if (!maxDate || e > maxDate) maxDate = e;
+  });
+
+  if (!minDate || !maxDate) {
+    document.getElementById('gantt-comp').innerHTML = '<div class="loading">Sin datos de fechas en las obras. Completá la información de cada obra.</div>';
+    return;
+  }
+
+  const totalDays = (maxDate - minDate) / 86400000 || 1;
+  function pct(ds) {
+    if (!ds) return 0;
+    const d = toD(ds);
+    return Math.max(0, Math.min(100, (d - minDate) / (totalDays * 86400000) * 100));
+  }
+  function wPct(s, e) {
+    const sd = toD(s) < minDate ? minDate : toD(s);
+    const ed = toD(e) > maxDate ? maxDate : toD(e);
+    return Math.max(0.5, (ed - sd) / (totalDays * 86400000) * 100);
+  }
+
+  // Build months header
+  const months = [];
+  let cur = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+  while (cur <= maxDate) { months.push(new Date(cur)); cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1); }
+  const mHead = months.map(m =>
+    `<div class="gc-month">${m.toLocaleDateString('es-AR',{month:'short',year:'2-digit'})}</div>`
+  ).join('');
+
+  // Today line
+  const todayPct = pct(new Date().toISOString().slice(0,10));
+
+  // Build rows
+  const rows = OBRAS_CONFIG.map(cfg => {
+    const obra = obrasData[cfg.id];
+    const nombre = obra?.nombre || cfg.nombre;
+
+    if (!obra || !obra.inicio || !obra.fin) {
+      return `<div class="gc-row">
+        <div class="gc-label"><div class="gc-dot" style="background:${cfg.color}"></div>${nombre}</div>
+        <div class="gc-bars"><div class="gc-today" style="left:${todayPct}%"></div><span style="font-size:10px;color:#bbb;line-height:34px;padding-left:8px">Sin fechas</span></div>
+      </div>`;
+    }
+
+    const oL = pct(obra.inicio), oW = wPct(obra.inicio, obra.fin);
+    // Main obra bar
+    let bars = `<div class="gc-bar" style="left:${oL}%;width:${oW}%;background:${cfg.color};opacity:.25"></div>`;
+
+    // Plan de trabajo bars
+    (obra.eventos||[]).filter(e=>e.type==='plan').forEach(ev => {
+      const l=pct(ev.inicio), w=wPct(ev.inicio,ev.fin);
+      bars += `<div class="gc-bar" style="left:${l}%;width:${w}%;background:#c0392b;opacity:.8" title="${ev.desc}">${w>6?ev.desc.slice(0,16)+'…':''}</div>`;
+    });
+
+    // Etapas HyS
+    (obra.eventos||[]).filter(e=>e.type==='etapa').forEach(ev => {
+      const l=pct(ev.inicio), w=wPct(ev.inicio,ev.fin);
+      bars += `<div class="gc-bar" style="left:${l}%;width:${w}%;background:${cfg.color};top:18px;height:6px;border-radius:3px;opacity:.7" title="${ev.desc}"></div>`;
+    });
+
+    return `<div class="gc-row">
+      <div class="gc-label"><div class="gc-dot" style="background:${cfg.color}"></div>${nombre}</div>
+      <div class="gc-bars">
+        <div class="gc-today" style="left:${todayPct}%"></div>
+        ${bars}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('gantt-comp').innerHTML = `
+    <div class="gc-head">
+      <span class="gc-title">Línea de tiempo — todas las obras</span>
+      <div class="gc-leg"><div class="gc-pill" style="background:#c0392b"></div>Plan Arq.</div>
+      <div class="gc-leg"><div class="gc-pill" style="background:#1a4fa0"></div>Etapas HyS</div>
+      <div style="margin-left:auto;font-size:10px;color:#888">Línea roja = hoy</div>
+    </div>
+    <div class="gc-table"><div class="gc-inner">
+      <div class="gc-months">${mHead}</div>
+      ${rows}
+    </div></div>
+  `;
+}
+
+// ── SERVICIOS ──
+function renderServicios() {
+  const wk = wkKey();
+  const rows = OBRAS_CONFIG.map(cfg => {
+    const obra = obrasData[cfg.id];
+    const nombre = obra?.nombre || cfg.nombre;
+    if (!obra) return `<tr><td><span style="color:${cfg.color};font-weight:700">●</span> ${nombre}</td><td colspan="5" style="color:#bbb;font-style:italic">Sin datos</td></tr>`;
+
+    const srv = obra.servicios?.[wk] || {};
+    const banio = srv.banio_u ? `${srv.banio_u} ud · ${srv.banio_l||0} limp/sem` : '—';
+    const agua = (srv.agua_d||srv.agua_b) ? `${srv.agua_d||0} disp · ${srv.agua_b||0} bid/sem` : '—';
+    const alarma = srv.alarma_e || '—';
+    const alarmaTag = srv.alarma_e === 'Activa' ? 'srv-ok' : srv.alarma_e === 'Sin activar' ? 'srv-warn' : 'srv-nd';
+    const prov = srv.alarma_p || '—';
+    const obs = srv.obs || '—';
+
+    return `<tr>
+      <td><span style="color:${cfg.color};font-weight:700">●</span> ${nombre}</td>
+      <td>${banio}</td>
+      <td>${agua}</td>
+      <td><span class="srv-tag ${alarmaTag}">${alarma}</span></td>
+      <td>${prov}</td>
+      <td style="color:#888">${obs}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('srv-table').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Obra</th>
+        <th>🚽 Baño químico</th>
+        <th>💧 Agua</th>
+        <th>🚨 Alarma</th>
+        <th>Proveedor alarma</th>
+        <th>Observaciones</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+
+// ══════════════════════════════════════
+// CENTRO DE COSTOS
+// ══════════════════════════════════════
+const CC_KEY = 'hs_costos_v3';
+
+const SRV_ITEMS = [
+  {key:'banio_u',    label:'Baño químico',          unidad:'unidad/mes'},
+  {key:'banio_limp', label:'Limpieza baño/semana',  unidad:'limpieza'},
+  {key:'agua_d',     label:'Dispenser agua',         unidad:'unidad/mes'},
+  {key:'agua_b',     label:'Bidón de agua',          unidad:'bidón'},
+  {key:'alarma',     label:'Alarma',                 unidad:'mes'},
+];
+const ROPA_ITEMS = [
+  {key:'pantalon', label:'Pantalón de trabajo'},
+  {key:'camisa',   label:'Camisa de trabajo'},
+  {key:'botin',    label:'Botín de seguridad'},
+];
+const EPP_DEFAULT = [
+  {key:'casco',    label:'Casco de seguridad'},
+  {key:'arnes',    label:'Arnés de seguridad'},
+  {key:'guantes',  label:'Guantes'},
+  {key:'anteojos', label:'Anteojos de seguridad'},
+  {key:'cabo_vida',label:'Cabo de vida'},
+  {key:'prot_aud', label:'Protección auditiva'},
+];
+
+// precios[obraId][mesKey] = { servicios:[{key,precio,proveedor}], ropa:[...], epp:[...] }
+let precios = JSON.parse(localStorage.getItem(CC_KEY)) || {};
+let activeCostosView = 'precios';
+
+function getMesKey(offset=0) {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth()+offset, 1)
+    .toISOString().slice(0,7);
+}
+
+function getPreciosObraMes(obraId, mesKey) {
+  if (!precios[obraId]) precios[obraId] = {};
+  if (!precios[obraId][mesKey]) {
+    // Copy from most recent previous month if exists
+    const prev = Object.keys(precios[obraId]).sort().filter(k => k <= mesKey).pop();
+    const base = prev ? JSON.parse(JSON.stringify(precios[obraId][prev])) : null;
+    precios[obraId][mesKey] = base || {
+      servicios: SRV_ITEMS.map(i => ({...i, precio:0, proveedor:''})),
+      ropa: ROPA_ITEMS.map(i => ({...i, precio:0})),
+      epp: EPP_DEFAULT.map(i => ({...i, precio:0})),
+    };
+  }
+  const p = precios[obraId][mesKey];
+  // Ensure all items exist
+  SRV_ITEMS.forEach(si => { if (!p.servicios.find(x=>x.key===si.key)) p.servicios.push({...si,precio:0,proveedor:''}); });
+  ROPA_ITEMS.forEach(ri => { if (!p.ropa.find(x=>x.key===ri.key)) p.ropa.push({...ri,precio:0}); });
+  if (!p.epp) p.epp = EPP_DEFAULT.map(i=>({...i,precio:0}));
+  return p;
+}
+
+// Get price for a month — uses closest earlier month if current not set
+function getPreciosMes(obraId, mesKey) {
+  if (!precios[obraId]) return null;
+  const available = Object.keys(precios[obraId]).sort().filter(k => k <= mesKey);
+  if (!available.length) return null;
+  return precios[obraId][available[available.length-1]];
+}
+
+function setCostosView(v) {
+  activeCostosView = v;
+  ['precios','analisis','comparar'].forEach(k => {
+    document.getElementById('cc-view-'+k).style.display = k===v?'':'none';
+    const tab = document.getElementById('cc-tab-'+k);
+    if (tab) { tab.style.background=k===v?'#1a4fa0':'#f0f2f6'; tab.style.color=k===v?'#fff':'#555'; }
+  });
+  if (v==='analisis') renderAnalisisObra();
+  if (v==='comparar') renderComparar();
+}
+
+function renderPreciosObra() {
+  const obraId = document.getElementById('cc-precios-obra-sel').value;
+  const mesKey = document.getElementById('cc-precios-mes-sel').value;
+  if (!obraId || !mesKey) return;
+  const cfg = OBRAS_CONFIG.find(o=>o.id===obraId);
+  const p = getPreciosObraMes(obraId, mesKey);
+  const mesLabel = new Date(mesKey+'-15').toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+
+  document.getElementById('cc-precios-content').innerHTML = `
+    <div style="background:#fffbe6;border:1px solid #ffe58f;border-radius:7px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#856404">
+      Editando precios de <strong>${cfg.nombre}</strong> para <strong>${mesLabel}</strong>.
+      Al guardar, si ya existe un precio para este mes se actualiza; si no, se crea nuevo registro.
+      Los meses anteriores conservan sus precios originales.
+    </div>
+    <div class="srv-table" style="margin-bottom:14px">
+      <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;font-size:12px;font-weight:700;color:${cfg.color}">🔧 Servicios — ${cfg.nombre} — ${mesLabel}</div>
+      <table>
+        <thead><tr><th>Ítem</th><th>Proveedor</th><th>Precio</th><th>Unidad</th></tr></thead>
+        <tbody>${p.servicios.map((s,i)=>`<tr>
+          <td style="font-size:11px">${s.label}</td>
+          <td><input type="text" value="${s.proveedor||''}" placeholder="Proveedor..." onchange="precios['${obraId}']['${mesKey}'].servicios[${i}].proveedor=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
+          <td><input type="number" min="0" step="0.01" value="${s.precio||0}" onchange="precios['${obraId}']['${mesKey}'].servicios[${i}].precio=parseFloat(this.value)||0" style="width:100px;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
+          <td style="color:#888;font-size:10px">${s.unidad}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+    <div class="srv-table" style="margin-bottom:14px">
+      <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;font-size:12px;font-weight:700;color:${cfg.color}">👕 Ropa — ${cfg.nombre}</div>
+      <table>
+        <thead><tr><th>Ítem</th><th>Precio unit.</th></tr></thead>
+        <tbody>${p.ropa.map((r,i)=>`<tr>
+          <td style="font-size:11px">${r.label}</td>
+          <td><input type="number" min="0" step="0.01" value="${r.precio||0}" onchange="precios['${obraId}']['${mesKey}'].ropa[${i}].precio=parseFloat(this.value)||0" style="width:100px;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+    <div class="srv-table">
+      <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;font-weight:700;color:${cfg.color}">🦺 EPP — ${cfg.nombre}</span>
+        <button class="sync-btn" onclick="addEppPrecio('${obraId}','${mesKey}')">+ Ítem</button>
+      </div>
+      <table>
+        <thead><tr><th>Ítem</th><th>Precio unit.</th><th></th></tr></thead>
+        <tbody>${p.epp.map((e,i)=>`<tr>
+          <td><input type="text" value="${e.label}" onchange="precios['${obraId}']['${mesKey}'].epp[${i}].label=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
+          <td><input type="number" min="0" step="0.01" value="${e.precio||0}" onchange="precios['${obraId}']['${mesKey}'].epp[${i}].precio=parseFloat(this.value)||0" style="width:100px;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
+          <td><button onclick="removeEppPrecio('${obraId}','${mesKey}',${i})" style="background:#fde8e8;color:#c0392b;border:none;border-radius:5px;padding:3px 7px;cursor:pointer">✕</button></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function addEppPrecio(obraId,mesKey){getPreciosObraMes(obraId,mesKey).epp.push({key:'epp_'+Date.now(),label:'Nuevo ítem',precio:0});renderPreciosObra();}
+function removeEppPrecio(obraId,mesKey,i){getPreciosObraMes(obraId,mesKey).epp.splice(i,1);renderPreciosObra();}
+
+function guardarPrecios(){
+  localStorage.setItem(CC_KEY,JSON.stringify(precios));
+  const ind=document.getElementById('cc-save-ind');
+  ind.textContent='✓ Precios guardados';ind.style.color='#1a6b2e';
+  setTimeout(()=>ind.textContent='',3000);
+}
+
+function fmtMoney(n){return '$'+Math.round(n||0).toLocaleString('es-AR');}
+
+function calcCostoObra(obraId, obra, mesKey){
+  if(!obra)return{servicios:{},srvTotal:0,epp:0,ropa:0,total:0,detalle:[]};
+  const p=getPreciosMes(obraId,mesKey)||getPreciosObraMes(obraId,mesKey);
+  const srvMap={}; SRV_ITEMS.forEach(s=>srvMap[s.key]=0);
+  let costoEpp=0,costoRopa=0;
+  const detalle=[];
+
+  Object.keys(obra.servicios||{}).forEach(wk=>{
+    const[y,w]=wk.split('-W').map(Number);
+    const jan4=new Date(y,0,4);
+    const d=new Date(jan4);
+    d.setDate(jan4.getDate()-((jan4.getDay()+6)%7)+(w-1)*7);
+    const mk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(mk!==mesKey)return;
+    const srv=obra.servicios[wk];
+    const fp=key=>(p.servicios.find(s=>s.key===key)||{}).precio||0;
+    if(srv.banio_u) srvMap['banio_u']+=srv.banio_u*fp('banio_u')/4.33;
+    if(srv.banio_l) srvMap['banio_limp']+=srv.banio_l*fp('banio_limp');
+    if(srv.agua_d)  srvMap['agua_d']+=srv.agua_d*fp('agua_d')/4.33;
+    if(srv.agua_b)  srvMap['agua_b']+=srv.agua_b*fp('agua_b');
+    if(srv.alarma_e==='Activa') srvMap['alarma']+=fp('alarma')/4.33;
+  });
+
+  const srvTotal=Object.values(srvMap).reduce((a,b)=>a+b,0);
+
+  (obra.personal||[]).forEach(op=>{
+    (op.ropa||[]).forEach(r=>{
+      if(!r.fecha||!r.fecha.startsWith(mesKey)||!r.item)return;
+      const match=p.ropa.find(pr=>pr.label.toLowerCase().includes(r.item.toLowerCase())||r.item.toLowerCase().includes(pr.label.toLowerCase()));
+      const precio=match?match.precio:0;
+      costoRopa+=(r.cant||0)*precio;
+      detalle.push({tipo:'Ropa',item:r.item+' ('+op.nombre+')',cant:r.cant,precio,total:(r.cant||0)*precio});
+    });
+    (op.epp||[]).forEach(e=>{
+      if(!e.fecha||!e.fecha.startsWith(mesKey)||!e.item)return;
+      const match=p.epp.find(pe=>pe.label.toLowerCase().includes(e.item.toLowerCase())||e.item.toLowerCase().includes(pe.label.toLowerCase()));
+      const precio=match?match.precio:0;
+      costoEpp+=(e.cant||0)*precio;
+      detalle.push({tipo:'EPP',item:e.item+' ('+op.nombre+')',cant:e.cant,precio,total:(e.cant||0)*precio});
+    });
+  });
+
+  return{servicios:srvMap,srvTotal,epp:costoEpp,ropa:costoRopa,total:srvTotal+costoEpp+costoRopa,detalle};
+}
+
+function renderAnalisisObra(){
+  const obraId=document.getElementById('cc-obra-sel').value;
+  const mesKey=document.getElementById('cc-mes-sel').value;
+  const obra=obrasData[obraId];
+  const cfg=OBRAS_CONFIG.find(o=>o.id===obraId);
+  if(!obra){document.getElementById('cc-analisis-content').innerHTML='<div class="no-data" style="padding:30px;text-align:center">Sin datos para esta obra.</div>';return;}
+  const c=calcCostoObra(obraId,obra,mesKey);
+  document.getElementById('cc-analisis-content').innerHTML=`
+    <div class="estado-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="estado-card"><div class="estado-n" style="color:#e67e22">${fmtMoney(c.srvTotal)}</div><div class="estado-l">Servicios</div></div>
+      <div class="estado-card"><div class="estado-n" style="color:#7c3fa0">${fmtMoney(c.epp)}</div><div class="estado-l">EPP</div></div>
+      <div class="estado-card"><div class="estado-n" style="color:#1a6b2e">${fmtMoney(c.ropa)}</div><div class="estado-l">Ropa de trabajo</div></div>
+      <div class="estado-card"><div class="estado-n" style="color:${cfg.color}">${fmtMoney(c.total)}</div><div class="estado-l">Total del mes</div></div>
+    </div>
+    <div class="srv-table" style="margin-top:14px">
+      <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;font-size:12px;font-weight:700">Desglose de servicios</div>
+      <table><thead><tr>${SRV_ITEMS.map(s=>`<th>${s.label}</th>`).join('')}</tr></thead>
+      <tbody><tr>${SRV_ITEMS.map(s=>`<td style="font-weight:600">${fmtMoney(c.servicios[s.key]||0)}</td>`).join('')}</tr></tbody></table>
+    </div>
+    ${c.detalle.length?`<div class="srv-table" style="margin-top:14px">
+      <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;font-size:12px;font-weight:700">Entregas EPP y Ropa este mes</div>
+      <table><thead><tr><th>Tipo</th><th>Ítem</th><th>Cant.</th><th>Precio unit.</th><th>Total</th></tr></thead>
+      <tbody>${c.detalle.map(d=>`<tr><td>${d.tipo}</td><td>${d.item}</td><td>${d.cant}</td><td>${fmtMoney(d.precio)}</td><td>${fmtMoney(d.total)}</td></tr>`).join('')}</tbody></table>
+    </div>`:'<div class="no-data" style="padding:16px;margin-top:12px">Sin entregas de EPP o ropa este mes.</div>'}
+  `;
+}
+
+function renderComparar(){
+  const mesKey=document.getElementById('cc-comp-mes-sel')?.value;
+  if(!mesKey)return;
+  const mesLabel=new Date(mesKey+'-15').toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+  const rows=OBRAS_CONFIG.map(cfg=>({
+    cfg,
+    c:calcCostoObra(cfg.id,obrasData[cfg.id],mesKey),
+    p:getPreciosMes(cfg.id,mesKey)||getPreciosObraMes(cfg.id,mesKey)
+  }));
+  const granTotal=rows.reduce((a,r)=>a+r.c.total,0);
+
+  // ── Servicios ──
+  const srvDataFn=r=>SRV_ITEMS.map(s=>`<td>${fmtMoney(r.c.servicios[s.key]||0)}</td>`).join('');
+  const srvTotalFn=()=>SRV_ITEMS.map(s=>`<td><strong>${fmtMoney(rows.reduce((a,r)=>a+(r.c.servicios[s.key]||0),0))}</strong></td>`).join('');
+
+  // ── EPP: unión de labels ──
+  const eppLabelsMap={};
+  rows.forEach(r=>(r.p.epp||EPP_DEFAULT).forEach(e=>{if(e.label)eppLabelsMap[e.label]=1;}));
+  const eppLabels=Object.keys(eppLabelsMap);
+
+  function eppCostForLabel(r,label){
+    let total=0;
+    (obrasData[r.cfg.id]?.personal||[]).forEach(op=>{
+      (op.epp||[]).forEach(e=>{
+        if(!e.fecha||!e.fecha.startsWith(mesKey)||!e.item)return;
+        if(e.item.toLowerCase().includes(label.toLowerCase())||label.toLowerCase().includes(e.item.toLowerCase())){
+          const match=(r.p.epp||[]).find(pe=>pe.label.toLowerCase().includes(e.item.toLowerCase())||e.item.toLowerCase().includes(pe.label.toLowerCase()));
+          total+=(e.cant||0)*(match?match.precio:0);
+        }
+      });
+    });
+    return total;
+  }
+  const eppDataFn=r=>eppLabels.map(l=>`<td>${fmtMoney(eppCostForLabel(r,l))}</td>`).join('');
+  const eppTotalFn=()=>eppLabels.map(l=>`<td><strong>${fmtMoney(rows.reduce((a,r)=>a+eppCostForLabel(r,l),0))}</strong></td>`).join('');
+
+  // ── Ropa ──
+  function ropaCostForKey(r,ropaKey){
+    let total=0;
+    (obrasData[r.cfg.id]?.personal||[]).forEach(op=>{
+      (op.ropa||[]).forEach(ro=>{
+        if(!ro.fecha||!ro.fecha.startsWith(mesKey)||!ro.item)return;
+        const match=(r.p.ropa||[]).find(pr=>pr.label.toLowerCase().includes(ro.item.toLowerCase())||ro.item.toLowerCase().includes(pr.label.toLowerCase()));
+        if(match&&match.key===ropaKey)total+=(ro.cant||0)*match.precio;
+      });
+    });
+    return total;
+  }
+  const ropaDataFn=r=>ROPA_ITEMS.map(ri=>`<td>${fmtMoney(ropaCostForKey(r,ri.key))}</td>`).join('');
+  const ropaTotalFn=()=>ROPA_ITEMS.map(ri=>`<td><strong>${fmtMoney(rows.reduce((a,r)=>a+ropaCostForKey(r,ri.key),0))}</strong></td>`).join('');
+
+  const nSrv=SRV_ITEMS.length;
+  const nEpp=eppLabels.length||1;
+  const nRopa=ROPA_ITEMS.length;
+
+  document.getElementById('cc-comparar-content').innerHTML=`
+    <div class="srv-table" style="overflow-x:auto">
+      <table style="min-width:${120+nSrv*110+nEpp*110+nRopa*110+80}px;border-collapse:collapse">
+        <thead>
+          <!-- FILA 1: grupos -->
+          <tr>
+            <th rowspan="2" style="vertical-align:bottom;min-width:140px;text-align:left">Obra</th>
+            <th colspan="${nSrv}" style="background:#fef0e7;color:#e67e22;text-align:center;border-left:3px solid #e0c090">🔧 Servicios</th>
+            <th colspan="${nEpp}" style="background:#ede9f6;color:#7c3fa0;text-align:center;border-left:3px solid #c0b0e0">🦺 EPP</th>
+            <th colspan="${nRopa}" style="background:#eef6f0;color:#1a6b2e;text-align:center;border-left:3px solid #a0c8b0">👕 Ropa de trabajo</th>
+            <th rowspan="2" style="vertical-align:bottom;text-align:center;font-weight:800;border-left:3px solid #ccc;min-width:80px">Total</th>
+          </tr>
+          <!-- FILA 2: sub-columnas -->
+          <tr>
+            ${SRV_ITEMS.map((s,i)=>`<th style="font-size:9px;white-space:nowrap;background:#fef0e7;${i===0?'border-left:3px solid #e0c090':''}">${s.label}</th>`).join('')}
+            ${eppLabels.length
+              ? eppLabels.map((l,i)=>`<th style="font-size:9px;white-space:nowrap;background:#ede9f6;${i===0?'border-left:3px solid #c0b0e0':''}">${l}</th>`).join('')
+              : `<th style="font-size:9px;background:#ede9f6;border-left:3px solid #c0b0e0">—</th>`}
+            ${ROPA_ITEMS.map((ri,i)=>`<th style="font-size:9px;white-space:nowrap;background:#eef6f0;${i===0?'border-left:3px solid #a0c8b0':''}">${ri.label}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r=>`<tr>
+            <td style="font-weight:600"><span style="color:${r.cfg.color}">●</span> ${r.cfg.nombre}</td>
+            ${srvDataFn(r)}
+            ${eppLabels.length?eppDataFn(r):'<td>—</td>'}
+            ${ropaDataFn(r)}
+            <td style="font-weight:800;border-left:3px solid #e0e4ec;text-align:center">${fmtMoney(r.c.total)}</td>
+          </tr>`).join('')}
+          <tr style="background:#f7f8fa;border-top:2px solid #ccc">
+            <td style="font-weight:800">TOTAL</td>
+            ${srvTotalFn()}
+            ${eppLabels.length?eppTotalFn():'<td></td>'}
+            ${ropaTotalFn()}
+            <td style="font-weight:800;border-left:3px solid #e0e4ec;text-align:center">${fmtMoney(granTotal)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+
+function populateSelectors(){
+  const obraOpts=OBRAS_CONFIG.map(o=>`<option value="${o.id}">${o.nombre}</option>`).join('');
+  ['cc-precios-obra-sel','cc-obra-sel'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=obraOpts;});
+  const now=new Date();
+  const months=[];
+  for(let i=-6;i<=6;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()+i,1);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const label=d.toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+    months.push({key,label});
+  }
+  const curMes=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const mOpts=months.map(m=>`<option value="${m.key}" ${m.key===curMes?'selected':''}>${m.label}</option>`).join('');
+  ['cc-precios-mes-sel','cc-mes-sel','cc-comp-mes-sel'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=mOpts;});
+}
+
+
+// ── INIT ──
+populateSelectors();
+renderPreciosObra();
+syncAll();
+
+
+// Auto-refresh every 5 minutes
+setInterval(syncAll, 5 * 60 * 1000);
+</script>
+</body>
+</html>
