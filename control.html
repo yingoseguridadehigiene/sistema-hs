@@ -114,7 +114,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f7;color:#1a2332;mi
   <div class="sec-title">Estado de obras — semana actual</div>
   <div class="sec-sub" id="tablero-fecha">Cargando...</div>
   <div class="estado-grid" id="estado-grid"></div>
-  <div class="cards-grid" id="cards-grid">
+  <div id="cards-grid">
     <div class="loading"><div class="spin"></div>Cargando datos de obras...</div>
   </div>
 </div>
@@ -280,98 +280,86 @@ function renderTablero() {
 
   let totalOk=0, totalAtt=0, totalProb=0, totalNR=0;
 
-  const cardsHTML = OBRAS_CONFIG.map(cfg => {
+  const rowsHTML = OBRAS_CONFIG.map(cfg => {
     const obra = obrasData[cfg.id];
+    const nombre = obra?.nombre || cfg.nombre;
 
     if (!obra) {
-      return `<div class="obra-card">
-        <div style="border-top:4px solid ${cfg.color};padding:16px 18px 10px">
-          <div style="font-size:15px;font-weight:800;color:#1a2332">${cfg.nombre}</div>
-          <div style="font-size:11px;color:#bbb;margin-top:4px">Sin datos — abrí la página de obra para cargar información</div>
-        </div>
-        <div style="padding:10px 18px">
-          <a href="${cfg.file}" target="_blank" class="card-link" style="display:inline-block;margin-top:4px">↗ Abrir obra</a>
-        </div>
-      </div>`;
+      return `
+        <tr style="border-top:3px solid ${cfg.color}">
+          <td colspan="5" style="padding:10px 14px">
+            <a href="${cfg.file}" target="_blank" style="font-size:14px;font-weight:800;color:#1a2332;text-decoration:none">${nombre} ↗</a>
+            <span style="font-size:11px;color:#bbb;margin-left:10px">Sin datos cargados</span>
+          </td>
+        </tr>`;
     }
 
     const rel = obra.relevamientos?.[wk];
-    let okCount=0, attCount=0, probCount=0, nrCount=0, ndCount=0;
-
+    let okC=0, attC=0, probC=0, nrC=0, ndC=0;
     CATS.forEach(cat => {
       const est = catEstado(rel, cat.key);
-      if (est==='ok') { okCount++; totalOk++; }
-      else if (est==='att') { attCount++; totalAtt++; }
-      else if (est==='prob') { probCount++; totalProb++; }
-      else if (est==='nr') { nrCount++; totalNR++; }
-      else ndCount++;
+      if (est==='ok') { okC++; totalOk++; }
+      else if (est==='att') { attC++; totalAtt++; }
+      else if (est==='prob') { probC++; totalProb++; }
+      else if (est==='nr') { nrC++; totalNR++; }
+      else ndC++;
     });
 
-    // Semáforo global de la obra
-    const obraEstado = probCount>0 ? 'prob' : attCount>0 ? 'att' : okCount>0 ? 'ok' : 'nd';
-    const estadoColor = {ok:'#1a6b2e', att:'#856404', prob:'#c0392b', nd:'#aaa'}[obraEstado];
-    const estadoLabel = {ok:'Sin problemas', att:'Con precauciones', prob:'Con problemas', nd:'Sin relevar'}[obraEstado];
+    // Detalle categorías con problemas o atención para tooltip
+    const catDetalle = CATS.map(cat => {
+      const est = catEstado(rel, cat.key);
+      if (est==='prob') return '✗ '+cat.label;
+      if (est==='att') return '⚠ '+cat.label;
+      return null;
+    }).filter(Boolean).join(' · ');
 
-    // Servicios desde la obra
-    const srv = (() => {
-      const sKeys = Object.keys(obra.servicios||{}).sort();
-      const match = sKeys.filter(k=>k<=wk).pop();
-      return match ? obra.servicios[match] : {};
-    })();
-
-    const srvRows = [
-      srv.banio_u ? `<div class="card-row"><span class="card-row-label">🚽 Baño químico</span><span class="card-row-val">${srv.banio_u} ud · ${srv.banio_l||0} limp/sem${srv.banio_prov?' · '+srv.banio_prov:''}</span></div>` : '',
-      srv.agua_d||srv.agua_b ? `<div class="card-row"><span class="card-row-label">💧 Agua</span><span class="card-row-val">${srv.agua_d||0} disp · ${srv.agua_b||0} bid/sem${srv.agua_prov?' · '+srv.agua_prov:''}</span></div>` : '',
-      srv.alarma_e && srv.alarma_e!=='No instalada' ? `<div class="card-row"><span class="card-row-label">🚨 Alarma</span><span class="card-row-val">${srv.alarma_e}${srv.alarma_p?' · '+srv.alarma_p:''}</span></div>` : '',
-    ].filter(Boolean).join('');
-
-    // Avance
-    const pct = obra.inicio && obra.fin ? Math.max(0,Math.min(100,
-      (new Date()-toD(obra.inicio))/(toD(obra.fin)-toD(obra.inicio))*100
-    )).toFixed(0) : null;
-
-    // Categorías detalladas
-    const catDetail = [
-      okCount>0 ? `<span class="cat-pill ok">✓ OK (${okCount})</span>` : '',
-      attCount>0 ? `<span class="cat-pill att">⚠ Precaución (${attCount})</span>` : '',
-      probCount>0 ? `<span class="cat-pill prob">✗ Problema (${probCount})</span>` : '',
-      nrCount>0 ? `<span class="cat-pill nr">○ Sin relev. (${nrCount})</span>` : '',
-    ].filter(Boolean).join('');
-
-    return `<div class="obra-card">
-      <div style="border-top:4px solid ${cfg.color};padding:14px 18px 8px">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-          <div>
-            <div style="font-size:15px;font-weight:800;color:#1a2332">${obra.nombre||cfg.nombre}</div>
-            <div style="font-size:10px;color:#888;margin-top:2px">${obra.dir||''}</div>
-          </div>
-          <div style="text-align:right;flex-shrink:0">
-            <div style="font-size:11px;font-weight:700;color:${estadoColor}">${estadoLabel}</div>
-            <a href="${cfg.file}" target="_blank" class="card-link" style="margin-top:4px;display:inline-block">↗ Abrir</a>
-          </div>
-        </div>
-        ${catDetail ? `<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">${catDetail}</div>` : `<div style="margin-top:8px;font-size:10px;color:#bbb">Sin relevamiento esta semana</div>`}
-      </div>
-      <div class="card-body">
-        <div class="card-row"><span class="card-row-label">DO</span><span class="card-row-val">${obra.do||'—'}</span></div>
-        <div class="card-row"><span class="card-row-label">Técnico HyS</span><span class="card-row-val">${obra.tecnico||'—'}</span></div>
-        <div class="card-row"><span class="card-row-label">ART</span><span class="card-row-val">${obra.art||'—'}</span></div>
-        ${pct!==null ? `<div class="card-row"><span class="card-row-label">Avance</span><span class="card-row-val">${pct}%
-          <span style="display:inline-block;width:55px;height:5px;background:#f0f2f6;border-radius:3px;margin-left:5px;vertical-align:middle">
-            <span style="display:block;width:${pct}%;height:100%;background:${cfg.color};border-radius:3px"></span>
-          </span></span></div>` : ''}
-        ${srvRows || '<div class="card-row"><span class="card-row-label">🔧 Servicios</span><span class="card-row-val" style="color:#bbb">Sin configurar</span></div>'}
-      </div>
-    </div>`;
+    return `
+      <tr style="border-top:3px solid ${cfg.color}">
+        <td style="padding:10px 14px;font-size:14px;font-weight:800;white-space:nowrap">
+          <a href="${cfg.file}" target="_blank" style="color:#1a2332;text-decoration:none">${nombre} ↗</a>
+          <div style="font-size:10px;color:#888;font-weight:400;margin-top:2px">${obra.dir||''}</div>
+        </td>
+        <td style="padding:10px 14px;text-align:center">
+          <div style="font-size:22px;font-weight:800;color:#1a6b2e">${okC}</div>
+          <div style="font-size:9px;color:#1a6b2e;font-weight:700;text-transform:uppercase">OK</div>
+        </td>
+        <td style="padding:10px 14px;text-align:center">
+          <div style="font-size:22px;font-weight:800;color:#856404">${attC}</div>
+          <div style="font-size:9px;color:#856404;font-weight:700;text-transform:uppercase">Precaución</div>
+        </td>
+        <td style="padding:10px 14px;text-align:center">
+          <div style="font-size:22px;font-weight:800;color:#c0392b">${probC}</div>
+          <div style="font-size:9px;color:#c0392b;font-weight:700;text-transform:uppercase">Con problemas</div>
+          ${probC>0||attC>0?`<div style="font-size:9px;color:#888;margin-top:3px;max-width:180px">${catDetalle}</div>`:''}
+        </td>
+        <td style="padding:10px 14px;text-align:center">
+          <div style="font-size:22px;font-weight:800;color:#7c3fa0">${nrC}</div>
+          <div style="font-size:9px;color:#7c3fa0;font-weight:700;text-transform:uppercase">Sin relevamiento</div>
+        </td>
+      </tr>`;
   }).join('');
 
-  document.getElementById('cards-grid').innerHTML = cardsHTML;
+  document.getElementById('cards-grid').innerHTML = `
+    <div class="srv-table">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left;min-width:200px">Obra</th>
+            <th style="text-align:center;background:#eef6f0;color:#1a6b2e;width:120px">✓ OK</th>
+            <th style="text-align:center;background:#fffbe6;color:#856404;width:120px">⚠ Precaución</th>
+            <th style="text-align:center;background:#fde8e8;color:#c0392b;width:180px">✗ Con problemas</th>
+            <th style="text-align:center;background:#ede9f6;color:#7c3fa0;width:140px">○ Sin relevamiento</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHTML}</tbody>
+      </table>
+    </div>`;
 
   document.getElementById('estado-grid').innerHTML = `
-    <div class="estado-card"><div class="estado-n" style="color:#1a6b2e">${totalOk}</div><div class="estado-l">Categorías OK</div></div>
-    <div class="estado-card"><div class="estado-n" style="color:#856404">${totalAtt}</div><div class="estado-l">Precaución</div></div>
-    <div class="estado-card"><div class="estado-n" style="color:#c0392b">${totalProb}</div><div class="estado-l">Con problemas</div></div>
-    <div class="estado-card"><div class="estado-n" style="color:#7c3fa0">${totalNR}</div><div class="estado-l">Sin relevamiento</div></div>
+    <div class="estado-card"><div class="estado-n" style="color:#1a6b2e">${totalOk}</div><div class="estado-l">Total OK</div></div>
+    <div class="estado-card"><div class="estado-n" style="color:#856404">${totalAtt}</div><div class="estado-l">Total precaución</div></div>
+    <div class="estado-card"><div class="estado-n" style="color:#c0392b">${totalProb}</div><div class="estado-l">Total problemas</div></div>
+    <div class="estado-card"><div class="estado-n" style="color:#7c3fa0">${totalNR}</div><div class="estado-l">Sin relevar</div></div>
     <div class="estado-card"><div class="estado-n">${OBRAS_CONFIG.length}</div><div class="estado-l">Obras activas</div></div>
   `;
 }
