@@ -280,80 +280,50 @@ function renderTablero() {
 
   let totalOk=0, totalAtt=0, totalProb=0, totalNR=0;
 
-  const rowsHTML = OBRAS_CONFIG.map(cfg => {
+  const blocksHTML = OBRAS_CONFIG.map(cfg => {
     const obra = obrasData[cfg.id];
     const nombre = obra?.nombre || cfg.nombre;
 
     if (!obra) {
-      return `
-        <tr style="border-top:3px solid ${cfg.color}">
-          <td colspan="5" style="padding:10px 14px">
-            <a href="${cfg.file}" target="_blank" style="font-size:14px;font-weight:800;color:#1a2332;text-decoration:none">${nombre} ↗</a>
-            <span style="font-size:11px;color:#bbb;margin-left:10px">Sin datos cargados</span>
-          </td>
-        </tr>`;
+      return `<div style="border-left:4px solid ${cfg.color};background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+        <div style="font-size:15px;font-weight:800;color:#1a2332">
+          <a href="${cfg.file}" target="_blank" style="color:#1a2332;text-decoration:none">${nombre} ↗</a>
+        </div>
+        <div style="font-size:11px;color:#bbb;margin-top:4px">Sin datos cargados</div>
+      </div>`;
     }
 
     const rel = obra.relevamientos?.[wk];
-    let okC=0, attC=0, probC=0, nrC=0, ndC=0;
+    let okC=0, attC=0, probC=0, nrC=0;
     CATS.forEach(cat => {
       const est = catEstado(rel, cat.key);
       if (est==='ok') { okC++; totalOk++; }
       else if (est==='att') { attC++; totalAtt++; }
       else if (est==='prob') { probC++; totalProb++; }
       else if (est==='nr') { nrC++; totalNR++; }
-      else ndC++;
     });
 
-    // Detalle categorías con problemas o atención para tooltip
-    const catDetalle = CATS.map(cat => {
-      const est = catEstado(rel, cat.key);
-      if (est==='prob') return '✗ '+cat.label;
-      if (est==='att') return '⚠ '+cat.label;
-      return null;
-    }).filter(Boolean).join(' · ');
+    const pill = (n, label, color, bg) =>
+      `<div style="flex:1;background:${bg};border-radius:8px;padding:10px 6px;text-align:center;min-width:80px">
+        <div style="font-size:24px;font-weight:800;color:${color};line-height:1">${n}</div>
+        <div style="font-size:9px;font-weight:700;color:${color};text-transform:uppercase;margin-top:3px">${label}</div>
+      </div>`;
 
-    return `
-      <tr style="border-top:3px solid ${cfg.color}">
-        <td style="padding:10px 14px;font-size:14px;font-weight:800;white-space:nowrap">
-          <a href="${cfg.file}" target="_blank" style="color:#1a2332;text-decoration:none">${nombre} ↗</a>
-          <div style="font-size:10px;color:#888;font-weight:400;margin-top:2px">${obra.dir||''}</div>
-        </td>
-        <td style="padding:10px 14px;text-align:center">
-          <div style="font-size:22px;font-weight:800;color:#1a6b2e">${okC}</div>
-          <div style="font-size:9px;color:#1a6b2e;font-weight:700;text-transform:uppercase">OK</div>
-        </td>
-        <td style="padding:10px 14px;text-align:center">
-          <div style="font-size:22px;font-weight:800;color:#856404">${attC}</div>
-          <div style="font-size:9px;color:#856404;font-weight:700;text-transform:uppercase">Precaución</div>
-        </td>
-        <td style="padding:10px 14px;text-align:center">
-          <div style="font-size:22px;font-weight:800;color:#c0392b">${probC}</div>
-          <div style="font-size:9px;color:#c0392b;font-weight:700;text-transform:uppercase">Con problemas</div>
-          ${probC>0||attC>0?`<div style="font-size:9px;color:#888;margin-top:3px;max-width:180px">${catDetalle}</div>`:''}
-        </td>
-        <td style="padding:10px 14px;text-align:center">
-          <div style="font-size:22px;font-weight:800;color:#7c3fa0">${nrC}</div>
-          <div style="font-size:9px;color:#7c3fa0;font-weight:700;text-transform:uppercase">Sin relevamiento</div>
-        </td>
-      </tr>`;
+    return `<div style="border-left:4px solid ${cfg.color};background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+      <div style="margin-bottom:10px">
+        <a href="${cfg.file}" target="_blank" style="font-size:15px;font-weight:800;color:#1a2332;text-decoration:none">${nombre} ↗</a>
+        <span style="font-size:10px;color:#888;margin-left:8px">${obra.dir||''}</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${pill(okC,   'OK',               '#1a6b2e','#eef6f0')}
+        ${pill(attC,  'Precaución',       '#856404','#fffbe6')}
+        ${pill(probC, 'Con problemas',    '#c0392b','#fde8e8')}
+        ${pill(nrC,   'Sin relevamiento', '#7c3fa0','#ede9f6')}
+      </div>
+    </div>`;
   }).join('');
 
-  document.getElementById('cards-grid').innerHTML = `
-    <div class="srv-table">
-      <table>
-        <thead>
-          <tr>
-            <th style="text-align:left;min-width:200px">Obra</th>
-            <th style="text-align:center;background:#eef6f0;color:#1a6b2e;width:120px">✓ OK</th>
-            <th style="text-align:center;background:#fffbe6;color:#856404;width:120px">⚠ Precaución</th>
-            <th style="text-align:center;background:#fde8e8;color:#c0392b;width:180px">✗ Con problemas</th>
-            <th style="text-align:center;background:#ede9f6;color:#7c3fa0;width:140px">○ Sin relevamiento</th>
-          </tr>
-        </thead>
-        <tbody>${rowsHTML}</tbody>
-      </table>
-    </div>`;
+  document.getElementById('cards-grid').innerHTML = blocksHTML;
 
   document.getElementById('estado-grid').innerHTML = `
     <div class="estado-card"><div class="estado-n" style="color:#1a6b2e">${totalOk}</div><div class="estado-l">Total OK</div></div>
