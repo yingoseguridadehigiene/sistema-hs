@@ -278,73 +278,95 @@ function renderTablero() {
   document.getElementById('tablero-fecha').textContent =
     'Semana ' + wk + ' · ' + now.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
 
-  // Global counters
-  let totalOk=0, totalAtt=0, totalProb=0, totalNR=0, totalND=0;
+  let totalOk=0, totalAtt=0, totalProb=0, totalNR=0;
 
   const cardsHTML = OBRAS_CONFIG.map(cfg => {
     const obra = obrasData[cfg.id];
+
     if (!obra) {
       return `<div class="obra-card">
-        <div class="card-head">
-          <div class="card-dot" style="background:${cfg.color}"></div>
-          <div><div class="card-title">${cfg.nombre}</div><div class="card-sub">Sin datos</div></div>
-          <a href="${cfg.file}" class="card-link" target="_blank">↗ Abrir obra</a>
+        <div style="border-top:4px solid ${cfg.color};padding:16px 18px 10px">
+          <div style="font-size:15px;font-weight:800;color:#1a2332">${cfg.nombre}</div>
+          <div style="font-size:11px;color:#bbb;margin-top:4px">Sin datos — abrí la página de obra para cargar información</div>
         </div>
-        <div class="card-body"><div class="no-data">No hay datos cargados aún</div></div>
+        <div style="padding:10px 18px">
+          <a href="${cfg.file}" target="_blank" class="card-link" style="display:inline-block;margin-top:4px">↗ Abrir obra</a>
+        </div>
       </div>`;
     }
 
     const rel = obra.relevamientos?.[wk];
-    const cats = CATS.map(cat => {
+    let okCount=0, attCount=0, probCount=0, nrCount=0, ndCount=0;
+
+    CATS.forEach(cat => {
       const est = catEstado(rel, cat.key);
-      if (est === 'ok') totalOk++;
-      else if (est === 'att') totalAtt++;
-      else if (est === 'prob') totalProb++;
-      else if (est === 'nr') totalNR++;
-      else totalND++;
-      return `<span class="cat-pill ${est}" title="${cat.label}">${cat.label}</span>`;
-    }).join('');
+      if (est==='ok') { okCount++; totalOk++; }
+      else if (est==='att') { attCount++; totalAtt++; }
+      else if (est==='prob') { probCount++; totalProb++; }
+      else if (est==='nr') { nrCount++; totalNR++; }
+      else ndCount++;
+    });
 
-    const srv = obra.servicios?.[wk] || {};
-    const srvInfo = [
-      srv.banio_u ? `🚽 ${srv.banio_u}ud` : '',
-      srv.agua_b ? `💧 ${srv.agua_b}bid` : '',
-      srv.alarma_e && srv.alarma_e !== 'No instalada' ? `🚨 ${srv.alarma_e}` : '',
-    ].filter(Boolean).join(' · ') || '—';
+    // Semáforo global de la obra
+    const obraEstado = probCount>0 ? 'prob' : attCount>0 ? 'att' : okCount>0 ? 'ok' : 'nd';
+    const estadoColor = {ok:'#1a6b2e', att:'#856404', prob:'#c0392b', nd:'#aaa'}[obraEstado];
+    const estadoLabel = {ok:'Sin problemas', att:'Con precauciones', prob:'Con problemas', nd:'Sin relevar'}[obraEstado];
 
-    const pct = obra.inicio && obra.fin ? Math.max(0, Math.min(100,
-      (new Date() - toD(obra.inicio)) / (toD(obra.fin) - toD(obra.inicio)) * 100
+    // Servicios desde la obra
+    const srv = (() => {
+      const sKeys = Object.keys(obra.servicios||{}).sort();
+      const match = sKeys.filter(k=>k<=wk).pop();
+      return match ? obra.servicios[match] : {};
+    })();
+
+    const srvRows = [
+      srv.banio_u ? `<div class="card-row"><span class="card-row-label">🚽 Baño químico</span><span class="card-row-val">${srv.banio_u} ud · ${srv.banio_l||0} limp/sem${srv.banio_prov?' · '+srv.banio_prov:''}</span></div>` : '',
+      srv.agua_d||srv.agua_b ? `<div class="card-row"><span class="card-row-label">💧 Agua</span><span class="card-row-val">${srv.agua_d||0} disp · ${srv.agua_b||0} bid/sem${srv.agua_prov?' · '+srv.agua_prov:''}</span></div>` : '',
+      srv.alarma_e && srv.alarma_e!=='No instalada' ? `<div class="card-row"><span class="card-row-label">🚨 Alarma</span><span class="card-row-val">${srv.alarma_e}${srv.alarma_p?' · '+srv.alarma_p:''}</span></div>` : '',
+    ].filter(Boolean).join('');
+
+    // Avance
+    const pct = obra.inicio && obra.fin ? Math.max(0,Math.min(100,
+      (new Date()-toD(obra.inicio))/(toD(obra.fin)-toD(obra.inicio))*100
     )).toFixed(0) : null;
 
+    // Categorías detalladas
+    const catDetail = [
+      okCount>0 ? `<span class="cat-pill ok">✓ OK (${okCount})</span>` : '',
+      attCount>0 ? `<span class="cat-pill att">⚠ Precaución (${attCount})</span>` : '',
+      probCount>0 ? `<span class="cat-pill prob">✗ Problema (${probCount})</span>` : '',
+      nrCount>0 ? `<span class="cat-pill nr">○ Sin relev. (${nrCount})</span>` : '',
+    ].filter(Boolean).join('');
+
     return `<div class="obra-card">
-      <div class="card-head">
-        <div class="card-dot" style="background:${cfg.color}"></div>
-        <div>
-          <div class="card-title">${obra.nombre || cfg.nombre}</div>
-          <div class="card-sub">${obra.dir || ''} ${obra.art ? '· ' + obra.art : ''}</div>
+      <div style="border-top:4px solid ${cfg.color};padding:14px 18px 8px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+          <div>
+            <div style="font-size:15px;font-weight:800;color:#1a2332">${obra.nombre||cfg.nombre}</div>
+            <div style="font-size:10px;color:#888;margin-top:2px">${obra.dir||''}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:11px;font-weight:700;color:${estadoColor}">${estadoLabel}</div>
+            <a href="${cfg.file}" target="_blank" class="card-link" style="margin-top:4px;display:inline-block">↗ Abrir</a>
+          </div>
         </div>
-        <a href="${cfg.file}" class="card-link" target="_blank">↗ Abrir</a>
+        ${catDetail ? `<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">${catDetail}</div>` : `<div style="margin-top:8px;font-size:10px;color:#bbb">Sin relevamiento esta semana</div>`}
       </div>
       <div class="card-body">
         <div class="card-row"><span class="card-row-label">DO</span><span class="card-row-val">${obra.do||'—'}</span></div>
-        <div class="card-row"><span class="card-row-label">AO</span><span class="card-row-val">${obra.ao||'—'}</span></div>
         <div class="card-row"><span class="card-row-label">Técnico HyS</span><span class="card-row-val">${obra.tecnico||'—'}</span></div>
-        <div class="card-row"><span class="card-row-label">Período</span><span class="card-row-val">${fmtD(obra.inicio)} → ${fmtD(obra.fin)}</span></div>
-        ${pct !== null ? `<div class="card-row"><span class="card-row-label">Avance estimado</span>
-          <span class="card-row-val">${pct}%
-            <span style="display:inline-block;width:60px;height:5px;background:#f0f2f6;border-radius:3px;margin-left:5px;vertical-align:middle">
-              <span style="display:block;width:${pct}%;height:100%;background:${cfg.color};border-radius:3px"></span>
-            </span>
-          </span></div>` : ''}
-        <div class="card-row"><span class="card-row-label">🔧 Servicios semana</span><span class="card-row-val">${srvInfo}</span></div>
+        <div class="card-row"><span class="card-row-label">ART</span><span class="card-row-val">${obra.art||'—'}</span></div>
+        ${pct!==null ? `<div class="card-row"><span class="card-row-label">Avance</span><span class="card-row-val">${pct}%
+          <span style="display:inline-block;width:55px;height:5px;background:#f0f2f6;border-radius:3px;margin-left:5px;vertical-align:middle">
+            <span style="display:block;width:${pct}%;height:100%;background:${cfg.color};border-radius:3px"></span>
+          </span></span></div>` : ''}
+        ${srvRows || '<div class="card-row"><span class="card-row-label">🔧 Servicios</span><span class="card-row-val" style="color:#bbb">Sin configurar</span></div>'}
       </div>
-      <div class="card-footer">${cats}</div>
     </div>`;
   }).join('');
 
   document.getElementById('cards-grid').innerHTML = cardsHTML;
 
-  // Estado global summary
   document.getElementById('estado-grid').innerHTML = `
     <div class="estado-card"><div class="estado-n" style="color:#1a6b2e">${totalOk}</div><div class="estado-l">Categorías OK</div></div>
     <div class="estado-card"><div class="estado-n" style="color:#856404">${totalAtt}</div><div class="estado-l">Precaución</div></div>
@@ -448,26 +470,38 @@ function renderGantt() {
 // ── SERVICIOS ──
 function renderServicios() {
   const wk = wkKey();
+  // Get most recent servicios at or before current week for each obra
+  function getSrv(obra) {
+    if (!obra || !obra.servicios) return {};
+    const keys = Object.keys(obra.servicios).sort().filter(k => k <= wk);
+    return keys.length ? obra.servicios[keys[keys.length-1]] : {};
+  }
+
   const rows = OBRAS_CONFIG.map(cfg => {
     const obra = obrasData[cfg.id];
     const nombre = obra?.nombre || cfg.nombre;
-    if (!obra) return `<tr><td><span style="color:${cfg.color};font-weight:700">●</span> ${nombre}</td><td colspan="5" style="color:#bbb;font-style:italic">Sin datos</td></tr>`;
+    if (!obra) return `<tr><td><span style="color:${cfg.color};font-weight:700">●</span> ${nombre}</td><td colspan="6" style="color:#bbb;font-style:italic">Sin datos</td></tr>`;
 
-    const srv = obra.servicios?.[wk] || {};
-    const banio = srv.banio_u ? `${srv.banio_u} ud · ${srv.banio_l||0} limp/sem` : '—';
-    const agua = (srv.agua_d||srv.agua_b) ? `${srv.agua_d||0} disp · ${srv.agua_b||0} bid/sem` : '—';
-    const alarma = srv.alarma_e || '—';
-    const alarmaTag = srv.alarma_e === 'Activa' ? 'srv-ok' : srv.alarma_e === 'Sin activar' ? 'srv-warn' : 'srv-nd';
-    const prov = srv.alarma_p || '—';
-    const obs = srv.obs || '—';
+    const srv = getSrv(obra);
+    const banioU = srv.banio_u || 0;
+    const banioL = srv.banio_l || 0;
+    const banioProv = srv.banio_prov || '—';
+    const disp = srv.agua_d || 0;
+    const bid = srv.agua_b || 0;
+    const aguaProv = srv.agua_prov || '—';
+    const alarmaE = srv.alarma_e || '—';
+    const alarmaP = srv.alarma_p || '—';
+    const alarmaTag = alarmaE==='Activa'?'srv-ok':alarmaE==='Sin activar'?'srv-warn':'srv-nd';
 
     return `<tr>
       <td><span style="color:${cfg.color};font-weight:700">●</span> ${nombre}</td>
-      <td>${banio}</td>
-      <td>${agua}</td>
-      <td><span class="srv-tag ${alarmaTag}">${alarma}</span></td>
-      <td>${prov}</td>
-      <td style="color:#888">${obs}</td>
+      <td>${banioU>0?banioU+' ud':'-'}</td>
+      <td>${banioL>0?banioL+' x/sem':'-'}</td>
+      <td>${banioProv}</td>
+      <td>${disp>0?disp+' disp':'-'} · ${bid>0?bid+' bid/sem':'-'}</td>
+      <td>${aguaProv}</td>
+      <td><span class="srv-tag ${alarmaTag}">${alarmaE}</span></td>
+      <td>${alarmaP}</td>
     </tr>`;
   }).join('');
 
@@ -475,11 +509,13 @@ function renderServicios() {
     <table>
       <thead><tr>
         <th>Obra</th>
-        <th>🚽 Baño químico</th>
+        <th>🚽 Unidades</th>
+        <th>Limpiezas/sem</th>
+        <th>Proveedor baño</th>
         <th>💧 Agua</th>
+        <th>Proveedor agua</th>
         <th>🚨 Alarma</th>
         <th>Proveedor alarma</th>
-        <th>Observaciones</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -821,7 +857,8 @@ syncAll();
 
 
 // Auto-refresh every 5 minutes
-setInterval(syncAll, 5 * 60 * 1000);
+// Auto-refresh every 30 seconds
+setInterval(syncAll, 30 * 1000);
 </script>
 </body>
 </html>
