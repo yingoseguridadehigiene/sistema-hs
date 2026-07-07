@@ -546,6 +546,11 @@ function renderTL(){
   </div>`;
   setTodayLine();
   renderWT();
+  // Scroll to current week after render
+  setTimeout(()=>{
+    const el=document.getElementById('semana-actual-row');
+    if(el){el.scrollIntoView({behavior:'smooth',block:'center'});}
+  },300);
 }
 
 function setTodayLine(){
@@ -565,10 +570,12 @@ function clickBar(idx,type){
 function renderWT(){
   if(!obra.inicio||!obra.fin)return;
   const t=toD(obra.inicio),e=toD(obra.fin);
+  const todayWK=wkKey();
   const weeks=[];let cur=new Date(t);cur.setDate(cur.getDate()-((cur.getDay()+6)%7));
   while(cur<=e){weeks.push(cur.toISOString().slice(0,10));cur=new Date(cur);cur.setDate(cur.getDate()+7);}
   const evs=obra.eventos||[];
   const rows=weeks.map(wk=>{
+    const isToday=wkKey(wk)===todayWK;
     const dt=new Date(wk+'T00:00:00');
     const dtE=new Date(dt);dtE.setDate(dt.getDate()+6);
     const label=dt.getDate()+'/'+(dt.getMonth()+1);
@@ -583,8 +590,8 @@ function renderWT(){
     const rel=obra.relevamientos[wkKey(wk)];
     const st=rel?(rel._noRelev?'#7c3fa0':catColor(rel)):'';
     const btnStyle=st?`background:${st}`:'background:#1a4fa0';
-    return`<div class="wt-row">
-      <div class="wtc"><div class="wt-wk">${label}</div><div class="wt-wk-sub">Sem ${wn}</div></div>
+    return`<div class="wt-row${isToday?' semana-actual':''}" ${isToday?'id="semana-actual-row"':''}>
+      <div class="wtc"><div class="wt-wk">${label}${isToday?' ◀':''}</div><div class="wt-wk-sub">Sem ${wn}</div></div>
       <div class="wtc">${chip(plW,'plan')}</div>
       <div class="wtc">${srvChip}</div>
       <div class="wtc">${chip(etW,'etapa')}</div>
@@ -594,7 +601,12 @@ function renderWT(){
     </div>`;
   }).join('');
 
+  const todayRange=wkRange(todayWK);
   document.getElementById('wt-wrap').innerHTML=`
+  <div style="background:#1a4fa0;color:#fff;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:10px">
+    <span>📅 Semana actual: ${todayWK}</span>
+    <span style="font-weight:400;opacity:.85">${todayRange}</span>
+  </div>
   <div class="wt-wrap">
     <div class="wt-head-row">
       <div class="wth">Semana</div>
