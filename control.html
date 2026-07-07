@@ -558,7 +558,12 @@ function getPreciosObraMes(obraId, mesKey) {
   // Ensure all items exist
   SRV_ITEMS.forEach(si => { if (!p.servicios.find(x=>x.key===si.key)) p.servicios.push({...si,precio:0,proveedor:''}); });
   ROPA_ITEMS.forEach(ri => { if (!p.ropa.find(x=>x.key===ri.key)) p.ropa.push({...ri,precio:0}); });
-  if (!p.epp) p.epp = EPP_DEFAULT.map(i=>({...i,precio:0}));
+  // Always ensure all EPP_DEFAULT items exist in p.epp
+  if (!p.epp) p.epp = [];
+  EPP_DEFAULT.forEach(def=>{
+    if(!p.epp.find(x=>x.key===def.key))
+      p.epp.push({...def,precio:0});
+  });
   return p;
 }
 
@@ -618,24 +623,34 @@ function renderPreciosObra() {
       </table>
     </div>
     <div class="srv-table">
-      <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;display:flex;align-items:center;justify-content:space-between">
+      <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6">
         <span style="font-size:12px;font-weight:700;color:${cfg.color}">🦺 EPP — ${cfg.nombre}</span>
-        <button class="sync-btn" onclick="addEppPrecio('${obraId}','${mesKey}')">+ Ítem</button>
       </div>
       <table>
-        <thead><tr><th>Ítem</th><th>Precio unit.</th><th></th></tr></thead>
-        <tbody>${p.epp.map((e,i)=>`<tr>
-          <td><input type="text" value="${e.label}" onchange="precios['${obraId}']['${mesKey}'].epp[${i}].label=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
-          <td><input type="number" min="0" step="0.01" value="${e.precio||0}" onchange="precios['${obraId}']['${mesKey}'].epp[${i}].precio=parseFloat(this.value)||0" style="width:100px;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
-          <td><button onclick="removeEppPrecio('${obraId}','${mesKey}',${i})" style="background:#fde8e8;color:#c0392b;border:none;border-radius:5px;padding:3px 7px;cursor:pointer">✕</button></td>
-        </tr>`).join('')}</tbody>
+        <thead><tr><th>Ítem</th><th>Precio unit.</th></tr></thead>
+        <tbody>${EPP_DEFAULT.map((e,i)=>{
+          const stored = p.epp.find(x=>x.key===e.key)||{precio:0};
+          return `<tr>
+            <td style="font-size:11px">${e.label}</td>
+            <td><input type="number" min="0" step="0.01" value="${stored.precio||0}"
+              onchange="setPrecioEpp('${obraId}','${mesKey}','${e.key}',parseFloat(this.value)||0)"
+              style="width:100px;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
+          </tr>`;
+        }).join('')}</tbody>
       </table>
     </div>
   `;
 }
 
-function addEppPrecio(obraId,mesKey){getPreciosObraMes(obraId,mesKey).epp.push({key:'epp_'+Date.now(),label:'Nuevo ítem',precio:0});renderPreciosObra();}
-function removeEppPrecio(obraId,mesKey,i){getPreciosObraMes(obraId,mesKey).epp.splice(i,1);renderPreciosObra();}
+function setPrecioEpp(obraId,mesKey,key,precio){
+  const p=getPreciosObraMes(obraId,mesKey);
+  const item=p.epp.find(x=>x.key===key);
+  if(item) item.precio=precio;
+  else {
+    const def=EPP_DEFAULT.find(e=>e.key===key);
+    if(def) p.epp.push({...def,precio});
+  }
+}
 
 async function guardarPrecios(){
   const ind=document.getElementById('cc-save-ind');
