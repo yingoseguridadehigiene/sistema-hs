@@ -568,7 +568,11 @@ function clickBar(idx,type){
 
 // ── RENDER WEEK TABLE ──
 function renderWT(){
-  if(!obra.inicio||!obra.fin)return;
+  if(!obra.inicio||!obra.fin){
+    document.getElementById('wt-wrap').innerHTML='<div style="padding:20px;color:#aaa;font-size:12px">Cargá las fechas de inicio y fin de la obra para ver el calendario semanal.</div>';
+    return;
+  }
+  try{
   const t=toD(obra.inicio),e=toD(obra.fin);
   const todayWK=wkKey();
   const weeks=[];let cur=new Date(t);cur.setDate(cur.getDate()-((cur.getDay()+6)%7));
@@ -620,6 +624,10 @@ function renderWT(){
     ${rows}
   </div>
   `;
+  }catch(err){
+    console.error('renderWT error:',err);
+    document.getElementById('wt-wrap').innerHTML='<div style="padding:20px;color:#c0392b;font-size:12px">Error al renderizar semanas: '+err.message+'</div>';
+  }
 }
 
 function catColor(rel){
