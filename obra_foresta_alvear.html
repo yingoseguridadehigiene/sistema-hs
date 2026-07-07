@@ -868,6 +868,28 @@ let eppRows = [];
 let ropaRows = [];
 
 const ROPA_OPTS = ['Pantalón de trabajo','Camisa de trabajo','Botín de seguridad'];
+const EPP_OPTS = [
+  'Casco de seguridad',
+  'Lentes de seguridad',
+  'Mentonera',
+  'Barbijo N95',
+  'Protección auditiva tipo copa',
+  'Protección auditiva tipo endoaurales',
+  'Semimáscara',
+  'Filtro para semimáscara',
+  'Guantes DPS',
+  'Guantes moteados',
+  'Guantes vaqueta (cuero)',
+  'Guantes latex (revoque)',
+  'Arnés de seguridad',
+  'Cabo de vida (doble mosquetón 55mm)',
+  'Dispositivo antitrauma',
+  'Línea de vida (soga)',
+  'Chaleco reflectivo',
+  'Capa de lluvia',
+  'Mameluco',
+  'Botas',
+];
 
 function openPersonalModal(){
   if(!obra.personal)obra.personal=[];
@@ -972,7 +994,7 @@ function renderEppRows(){
   wrap.innerHTML=sorted.map(row=>{
     const i=row._idx;
     return `<div style="display:grid;grid-template-columns:1.6fr 0.7fr 1fr 30px;gap:6px;margin-bottom:6px;align-items:center">
-      <input type="text" placeholder="Ej: Arnés de seguridad" value="${(row.item||'').replace(/"/g,'&quot;')}" onchange="updateEppRow(${i},'item',this.value)" style="border:1px solid #d0d4db;border-radius:6px;padding:6px 8px;font-size:11px">
+      <select onchange="updateEppRow(${i},'item',this.value)" style="border:1px solid #d0d4db;border-radius:6px;padding:6px 8px;font-size:11px"><option value="">Seleccionar EPP...</option>${EPP_OPTS.map(o=>`<option value="${o}" ${row.item===o?'selected':''}>${o}</option>`).join('')}</select>
       <input type="number" min="0" placeholder="Cant." value="${row.cant||0}" onchange="updateEppRow(${i},'cant',this.value)" style="border:1px solid #d0d4db;border-radius:6px;padding:6px 8px;font-size:11px">
       <input type="date" value="${row.fecha||''}" onchange="updateEppRow(${i},'fecha',this.value)" style="border:1px solid #d0d4db;border-radius:6px;padding:6px 8px;font-size:11px">
       <button onclick="removeEppRow(${i})" style="background:#fde8e8;color:#c0392b;border:none;border-radius:6px;height:30px;cursor:pointer;font-size:13px">✕</button>
