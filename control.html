@@ -500,7 +500,23 @@ const EPP_DEFAULT = [
 ];
 
 // precios[obraId][mesKey] = { servicios:[{key,precio,proveedor}], ropa:[...], epp:[...] }
-let precios = JSON.parse(localStorage.getItem(CC_KEY)) || {};
+let precios = {};
+
+async function loadPrecios(){
+  try{
+    const resp = await fetch(SB_URL+'/rest/v1/obras_data?id=eq.costos_precios&select=data',{
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+    });
+    const rows = await resp.json();
+    if(rows&&rows.length&&rows[0].data&&rows[0].data.precios){
+      precios = rows[0].data.precios;
+    }
+  }catch(e){
+    // fallback to localStorage
+    const local = localStorage.getItem(CC_KEY);
+    if(local) try{ precios = JSON.parse(local).precios||{}; }catch(e2){}
+  }
+}
 let activeCostosView = 'precios';
 
 function getMesKey(offset=0) {
@@ -604,10 +620,22 @@ function renderPreciosObra() {
 function addEppPrecio(obraId,mesKey){getPreciosObraMes(obraId,mesKey).epp.push({key:'epp_'+Date.now(),label:'Nuevo ítem',precio:0});renderPreciosObra();}
 function removeEppPrecio(obraId,mesKey,i){getPreciosObraMes(obraId,mesKey).epp.splice(i,1);renderPreciosObra();}
 
-function guardarPrecios(){
-  localStorage.setItem(CC_KEY,JSON.stringify(precios));
+async function guardarPrecios(){
   const ind=document.getElementById('cc-save-ind');
-  ind.textContent='✓ Precios guardados';ind.style.color='#1a6b2e';
+  ind.textContent='⏳ Guardando...';ind.style.color='#856404';
+  try{
+    const resp=await fetch(SB_URL+'/rest/v1/obras_data?id=eq.costos_precios',{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
+      body:JSON.stringify({data:{precios},updated_at:new Date().toISOString()})
+    });
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    localStorage.setItem(CC_KEY,JSON.stringify({precios}));
+    ind.textContent='☁ Precios guardados en la nube';ind.style.color='#1a6b2e';
+  }catch(e){
+    localStorage.setItem(CC_KEY,JSON.stringify({precios}));
+    ind.textContent='✓ Guardado local (sin conexión)';ind.style.color='#856404';
+  }
   setTimeout(()=>ind.textContent='',3000);
 }
 
@@ -801,13 +829,17 @@ function populateSelectors(){
 
 
 // ── INIT ──
-populateSelectors();
-renderPreciosObra();
-syncAll();
+(async()=>{
+  populateSelectors();
+  await loadPrecios();
+  renderPreciosObra();
+  await syncAll();
+  // Auto-refresh every 30 seconds
+})();
+setInterval(syncAll, 30 * 1000);
 
 
 // Auto-refresh every 5 minutes
-// Auto-refresh every 30 seconds
 setInterval(syncAll, 30 * 1000);
 </script>
 </body>
