@@ -734,7 +734,7 @@ function renderComparar(){
   const rows=OBRAS_CONFIG.map(cfg=>({
     cfg,
     c:calcCostoObra(cfg.id,obrasData[cfg.id],mesKey),
-    p:getPreciosMes(cfg.id,mesKey)||getPreciosObraMes(cfg.id,mesKey)
+    p:getPreciosMes(cfg.id,mesKey)||{servicios:SRV_ITEMS.map(s=>({...s,precio:0})),epp:EPP_DEFAULT.map(e=>({...e,precio:0})),ropa:ROPA_ITEMS.map(r=>({...r,precio:0}))}
   }));
   const granTotal=rows.reduce((a,r)=>a+r.c.total,0);
 
@@ -742,10 +742,8 @@ function renderComparar(){
   const srvDataFn=r=>SRV_ITEMS.map(s=>`<td>${fmtMoney(r.c.servicios[s.key]||0)}</td>`).join('');
   const srvTotalFn=()=>SRV_ITEMS.map(s=>`<td><strong>${fmtMoney(rows.reduce((a,r)=>a+(r.c.servicios[s.key]||0),0))}</strong></td>`).join('');
 
-  // ── EPP: unión de labels ──
-  const eppLabelsMap={};
-  rows.forEach(r=>(r.p.epp||EPP_DEFAULT).forEach(e=>{if(e.label)eppLabelsMap[e.label]=1;}));
-  const eppLabels=Object.keys(eppLabelsMap);
+  // ── EPP: siempre usar EPP_DEFAULT como columnas fijas ──
+  const eppLabels=EPP_DEFAULT.map(e=>e.label);
 
   function eppCostForLabel(r,label){
     let total=0;
