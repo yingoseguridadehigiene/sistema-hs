@@ -585,9 +585,9 @@ function renderWT(){
     const etW=evWk.filter(e=>e.type==='etapa');
     const caW=evWk.filter(e=>e.type==='cap');
     const inW=evWk.filter(e=>e.type==='insp');
-    const srv=obra.servicios[wkKey(wk)]||{};
+    const srv=(obra.servicios||{})[wkKey(wk)]||{};
     const srvChip=srv.banio_u?`<span class="ev-chip servicios">🚽${srv.banio_u}ud</span>`:'<span class="ev-chip none">—</span>';
-    const rel=obra.relevamientos[wkKey(wk)];
+    const rel=(obra.relevamientos||{})[wkKey(wk)];
     const st=rel?(rel._noRelev?'#7c3fa0':catColor(rel)):'';
     const btnStyle=st?`background:${st}`:'background:#1a4fa0';
     return`<div class="wt-row${isToday?' semana-actual':''}" ${isToday?'id="semana-actual-row"':''}>
