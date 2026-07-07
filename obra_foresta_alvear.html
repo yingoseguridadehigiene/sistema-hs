@@ -54,7 +54,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 .gbar:hover{opacity:.82}
 .gbar.plan{background:#c0392b;opacity:.85}
 .gbar.etapa{background:#1a4fa0}
-.gbar.servicios{background:#e67e22;opacity:.9}
+
 .gbar.cap{background:#1a6b2e;height:14px;border-radius:7px;top:7px}
 .gbar.insp{background:#7c3fa0;width:14px!important;height:14px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;font-size:10px}
 .gbar.insp::after{content:"●";color:#fff;font-size:9px}
@@ -529,7 +529,7 @@ function renderTL(){
     <div class="tl-head">
       <span class="tl-title">Línea de tiempo — ${obra.nombre||''}</span>
       <div class="leg"><div class="leg-pill" style="background:#c0392b"></div>Plan Arq.</div>
-      <div class="leg"><div class="leg-pill" style="background:#e67e22"></div>Servicios</div>
+
       <div class="leg"><div class="leg-pill" style="background:#1a4fa0"></div>Etapas HyS</div>
       <div class="leg"><div class="leg-pill" style="background:#1a6b2e"></div>Capacitaciones</div>
       <div class="leg"><div class="leg-pill" style="background:#7c3fa0"></div>Inspecciones</div>
@@ -538,7 +538,7 @@ function renderTL(){
     <div class="gantt-table"><div class="gantt-inner">
       <div class="gantt-months" style="padding-left:160px">${mHead}</div>
       ${planEvs.length?barRow('Plan de trabajo (Arq.)','#c0392b',planEvs,'plan'):''}
-      ${barRow('Servicios','#e67e22',srvEvs,'servicios')}
+
       ${barRow('Etapas constructivas','#1a4fa0',etapas,'etapa')}
       ${barRow('Capacitaciones','#1a6b2e',caps,'cap')}
       ${barRow('Inspecciones HyS','#7c3fa0',insps,'insp')}

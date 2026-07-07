@@ -443,8 +443,10 @@ function renderServicios() {
     const alarmaP = srv.alarma_p || '—';
     const alarmaTag = alarmaE==='Activa'?'srv-ok':alarmaE==='Sin activar'?'srv-warn':'srv-nd';
 
+    const personalCount = (obra?.personal||[]).length;
     return `<tr>
       <td><span style="color:${cfg.color};font-weight:700">●</span> ${nombre}</td>
+      <td style="text-align:center;font-weight:700">${personalCount}</td>
       <td>${banioU>0?banioU+' ud':'-'}</td>
       <td>${banioL>0?banioL+' x/sem':'-'}</td>
       <td>${banioProv}</td>
@@ -459,6 +461,7 @@ function renderServicios() {
     <table>
       <thead><tr>
         <th>Obra</th>
+        <th style="text-align:center">👷 Personal</th>
         <th>🚽 Unidades</th>
         <th>Limpiezas/sem</th>
         <th>Proveedor baño</th>
@@ -738,13 +741,6 @@ function renderComparar(){
   }));
   const granTotal=rows.reduce((a,r)=>a+r.c.total,0);
 
-  // ── Servicios ──
-  const srvDataFn=r=>SRV_ITEMS.map(s=>`<td>${fmtMoney(r.c.servicios[s.key]||0)}</td>`).join('');
-  const srvTotalFn=()=>SRV_ITEMS.map(s=>`<td><strong>${fmtMoney(rows.reduce((a,r)=>a+(r.c.servicios[s.key]||0),0))}</strong></td>`).join('');
-
-  // ── EPP: siempre usar EPP_DEFAULT como columnas fijas ──
-  const eppLabels=EPP_DEFAULT.map(e=>e.label);
-
   function eppCostForLabel(r,label){
     let total=0;
     (obrasData[r.cfg.id]?.personal||[]).forEach(op=>{
@@ -758,10 +754,6 @@ function renderComparar(){
     });
     return total;
   }
-  const eppDataFn=r=>eppLabels.map(l=>`<td>${fmtMoney(eppCostForLabel(r,l))}</td>`).join('');
-  const eppTotalFn=()=>eppLabels.map(l=>`<td><strong>${fmtMoney(rows.reduce((a,r)=>a+eppCostForLabel(r,l),0))}</strong></td>`).join('');
-
-  // ── Ropa ──
   function ropaCostForKey(r,ropaKey){
     let total=0;
     (obrasData[r.cfg.id]?.personal||[]).forEach(op=>{
@@ -773,48 +765,72 @@ function renderComparar(){
     });
     return total;
   }
-  const ropaDataFn=r=>ROPA_ITEMS.map(ri=>`<td>${fmtMoney(ropaCostForKey(r,ri.key))}</td>`).join('');
-  const ropaTotalFn=()=>ROPA_ITEMS.map(ri=>`<td><strong>${fmtMoney(rows.reduce((a,r)=>a+ropaCostForKey(r,ri.key),0))}</strong></td>`).join('');
 
-  const nSrv=SRV_ITEMS.length;
-  const nEpp=eppLabels.length||1;
-  const nRopa=ROPA_ITEMS.length;
+  // Filas = ítems, Columnas = obras
+  const obraHeaders = rows.map(r=>`<th style="text-align:center;min-width:110px;color:${r.cfg.color}">${r.cfg.nombre}</th>`).join('');
+  const totalHeader = `<th style="text-align:center;min-width:90px;font-weight:800">Total</th>`;
+
+  function buildRow(label, valFn, bg=''){
+    const vals = rows.map(r=>valFn(r));
+    const total = vals.reduce((a,b)=>a+b,0);
+    return `<tr style="background:${bg}">
+      <td style="font-size:11px;padding:7px 12px;white-space:nowrap">${label}</td>
+      ${vals.map(v=>`<td style="text-align:center;font-size:11px">${fmtMoney(v)}</td>`).join('')}
+      <td style="text-align:center;font-size:11px;font-weight:700">${fmtMoney(total)}</td>
+    </tr>`;
+  }
+
+  function buildSectionHeader(label, color, bg, colspan){
+    return `<tr><td colspan="${colspan}" style="background:${bg};color:${color};font-weight:800;font-size:11px;padding:8px 12px;text-transform:uppercase;letter-spacing:.05em">${label}</td></tr>`;
+  }
+
+  const n = rows.length + 2; // obras + item label + total
+
+  const srvRows = SRV_ITEMS.map(s=>buildRow(s.label, r=>(r.c.servicios[s.key]||0), '#fef9f5')).join('');
+  const eppRows = EPP_DEFAULT.map(e=>buildRow(e.label, r=>eppCostForLabel(r,e.label), '#f8f5fc')).join('');
+  const ropaRows = ROPA_ITEMS.map(ri=>buildRow(ri.label, r=>ropaCostForKey(r,ri.key), '#f5faf6')).join('');
+
+  const srvTotal = rows.map(r=>Object.values(r.c.servicios).reduce((a,b)=>a+b,0));
+  const eppTotal = rows.map(r=>r.c.epp);
+  const ropaTotal = rows.map(r=>r.c.ropa);
+  const grandTotals = rows.map((r,i)=>srvTotal[i]+eppTotal[i]+ropaTotal[i]);
 
   document.getElementById('cc-comparar-content').innerHTML=`
     <div class="srv-table" style="overflow-x:auto">
-      <table style="min-width:${120+nSrv*110+nEpp*110+nRopa*110+80}px;border-collapse:collapse">
+      <table style="border-collapse:collapse;width:100%">
         <thead>
-          <!-- FILA 1: grupos -->
           <tr>
-            <th rowspan="2" style="vertical-align:bottom;min-width:140px;text-align:left">Obra</th>
-            <th colspan="${nSrv}" style="background:#fef0e7;color:#e67e22;text-align:center;border-left:3px solid #e0c090">🔧 Servicios</th>
-            <th colspan="${nEpp}" style="background:#ede9f6;color:#7c3fa0;text-align:center;border-left:3px solid #c0b0e0">🦺 EPP</th>
-            <th colspan="${nRopa}" style="background:#eef6f0;color:#1a6b2e;text-align:center;border-left:3px solid #a0c8b0">👕 Ropa de trabajo</th>
-            <th rowspan="2" style="vertical-align:bottom;text-align:center;font-weight:800;border-left:3px solid #ccc;min-width:80px">Total</th>
-          </tr>
-          <!-- FILA 2: sub-columnas -->
-          <tr>
-            ${SRV_ITEMS.map((s,i)=>`<th style="font-size:9px;white-space:nowrap;background:#fef0e7;${i===0?'border-left:3px solid #e0c090':''}">${s.label}</th>`).join('')}
-            ${eppLabels.length
-              ? eppLabels.map((l,i)=>`<th style="font-size:9px;white-space:nowrap;background:#ede9f6;${i===0?'border-left:3px solid #c0b0e0':''}">${l}</th>`).join('')
-              : `<th style="font-size:9px;background:#ede9f6;border-left:3px solid #c0b0e0">—</th>`}
-            ${ROPA_ITEMS.map((ri,i)=>`<th style="font-size:9px;white-space:nowrap;background:#eef6f0;${i===0?'border-left:3px solid #a0c8b0':''}">${ri.label}</th>`).join('')}
+            <th style="text-align:left;min-width:200px">Ítem</th>
+            ${obraHeaders}
+            ${totalHeader}
           </tr>
         </thead>
         <tbody>
-          ${rows.map(r=>`<tr>
-            <td style="font-weight:600"><span style="color:${r.cfg.color}">●</span> ${r.cfg.nombre}</td>
-            ${srvDataFn(r)}
-            ${eppLabels.length?eppDataFn(r):'<td>—</td>'}
-            ${ropaDataFn(r)}
-            <td style="font-weight:800;border-left:3px solid #e0e4ec;text-align:center">${fmtMoney(r.c.total)}</td>
-          </tr>`).join('')}
-          <tr style="background:#f7f8fa;border-top:2px solid #ccc">
-            <td style="font-weight:800">TOTAL</td>
-            ${srvTotalFn()}
-            ${eppLabels.length?eppTotalFn():'<td></td>'}
-            ${ropaTotalFn()}
-            <td style="font-weight:800;border-left:3px solid #e0e4ec;text-align:center">${fmtMoney(granTotal)}</td>
+          ${buildSectionHeader('🔧 Servicios','#e67e22','#fef0e7',n)}
+          ${srvRows}
+          <tr style="background:#fef0e7;font-weight:700">
+            <td style="padding:6px 12px;font-size:11px">Subtotal servicios</td>
+            ${srvTotal.map(v=>`<td style="text-align:center;font-size:11px">${fmtMoney(v)}</td>`).join('')}
+            <td style="text-align:center;font-size:11px">${fmtMoney(srvTotal.reduce((a,b)=>a+b,0))}</td>
+          </tr>
+          ${buildSectionHeader('🦺 EPP','#7c3fa0','#ede9f6',n)}
+          ${eppRows}
+          <tr style="background:#ede9f6;font-weight:700">
+            <td style="padding:6px 12px;font-size:11px">Subtotal EPP</td>
+            ${eppTotal.map(v=>`<td style="text-align:center;font-size:11px">${fmtMoney(v)}</td>`).join('')}
+            <td style="text-align:center;font-size:11px">${fmtMoney(eppTotal.reduce((a,b)=>a+b,0))}</td>
+          </tr>
+          ${buildSectionHeader('👕 Ropa de trabajo','#1a6b2e','#eef6f0',n)}
+          ${ropaRows}
+          <tr style="background:#eef6f0;font-weight:700">
+            <td style="padding:6px 12px;font-size:11px">Subtotal ropa</td>
+            ${ropaTotal.map(v=>`<td style="text-align:center;font-size:11px">${fmtMoney(v)}</td>`).join('')}
+            <td style="text-align:center;font-size:11px">${fmtMoney(ropaTotal.reduce((a,b)=>a+b,0))}</td>
+          </tr>
+          <tr style="background:#1a2332;color:#fff;font-weight:800">
+            <td style="padding:9px 12px;font-size:12px">TOTAL GENERAL</td>
+            ${grandTotals.map(v=>`<td style="text-align:center;font-size:12px">${fmtMoney(v)}</td>`).join('')}
+            <td style="text-align:center;font-size:12px">${fmtMoney(grandTotals.reduce((a,b)=>a+b,0))}</td>
           </tr>
         </tbody>
       </table>
