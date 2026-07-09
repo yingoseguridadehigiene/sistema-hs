@@ -494,14 +494,21 @@ function renderServicios() {
 const CC_KEY = 'hs_costos_v3';
 
 const SRV_ITEMS = [
-  {key:'banio_u',    label:'Baño químico',           unidad:'unidad/mes'},
-  {key:'banio_limp', label:'Limpieza baño/semana',   unidad:'limpieza'},
-  {key:'agua_d',     label:'Dispenser agua',          unidad:'unidad/mes'},
-  {key:'agua_b',     label:'Bidón de agua',           unidad:'bidón'},
-  {key:'alarma',     label:'Alarma',                  unidad:'mes'},
-  {key:'ext_compra', label:'Extintor — Compra',       unidad:'unidad'},
-  {key:'ext_recarga',label:'Extintor — Recarga',      unidad:'unidad'},
+  {key:'banio_u',         label:'Baño químico',                  unidad:'unidad/mes'},
+  {key:'banio_limp',      label:'Limpieza baño/semana',          unidad:'limpieza'},
+  {key:'agua_d',          label:'Dispenser agua',                 unidad:'unidad/mes'},
+  {key:'agua_b',          label:'Bidón de agua',                  unidad:'bidón'},
+  {key:'alarma',          label:'Alarma',                         unidad:'mes'},
 ];
+// Tipos de extintor — combinaciones tipo + motivo
+const EXT_TIPOS = ['ABC 10kg','ABC 5kg','CO2','Agua'];
+const EXT_MOTIVOS = ['Compra','Recarga'];
+const EXT_SRV_ITEMS = EXT_TIPOS.flatMap(tipo=>EXT_MOTIVOS.map(mot=>({
+  key:'ext_'+tipo.replace(/\s/g,'_').replace(/\//g,'_')+'_'+mot.toLowerCase(),
+  label:'Extintor '+tipo+' — '+mot,
+  tipo, mot: mot.toLowerCase(), unidad:'unidad'
+})));
+const ALL_SRV_ITEMS = [...SRV_ITEMS, ...EXT_SRV_ITEMS];
 const ROPA_ITEMS = [
   {key:'pantalon', label:'Pantalón de trabajo'},
   {key:'camisa',   label:'Camisa de trabajo'},
@@ -574,7 +581,7 @@ function getPreciosObraMes(obraId, mesKey) {
   }
   const p = precios[obraId][mesKey];
   // Ensure all items exist
-  SRV_ITEMS.forEach(si => { if (!p.servicios.find(x=>x.key===si.key)) p.servicios.push({...si,precio:0,proveedor:''}); });
+  ALL_SRV_ITEMS.forEach(si => { if (!p.servicios.find(x=>x.key===si.key)) p.servicios.push({...si,precio:0,proveedor:''}); });
   ROPA_ITEMS.forEach(ri => { if (!p.ropa.find(x=>x.key===ri.key)) p.ropa.push({...ri,precio:0}); });
   // Always ensure all EPP_DEFAULT items exist in p.epp
   if (!p.epp) p.epp = [];
@@ -622,12 +629,19 @@ function renderPreciosObra() {
       <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;font-size:12px;font-weight:700;color:${cfg.color}">🔧 Servicios — ${cfg.nombre} — ${mesLabel}</div>
       <table>
         <thead><tr><th>Ítem</th><th>Proveedor</th><th>Precio</th><th>Unidad</th></tr></thead>
-        <tbody>${p.servicios.map((s,i)=>`<tr>
-          <td style="font-size:11px">${s.label}</td>
-          <td><input type="text" value="${s.proveedor||''}" placeholder="Proveedor..." onchange="precios['${obraId}']['${mesKey}'].servicios[${i}].proveedor=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
-          <td><input type="number" min="0" step="0.01" value="${s.precio||0}" onchange="precios['${obraId}']['${mesKey}'].servicios[${i}].precio=parseFloat(this.value)||0" style="width:100px;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
-          <td style="color:#888;font-size:10px">${s.unidad}</td>
-        </tr>`).join('')}</tbody>
+        <tbody>
+        ${ALL_SRV_ITEMS.map((si)=>{
+          const stored=p.servicios.find(x=>x.key===si.key)||{precio:0,proveedor:''};
+          const isExt=si.key.startsWith('ext_');
+          return `<tr style="${isExt?'background:#fef9f5':''}">
+            <td style="font-size:11px${isExt?';padding-left:20px':''}">${si.label}</td>
+            <td>${!isExt?`<input type="text" value="${stored.proveedor||''}" placeholder="Proveedor..." onchange="setPrecioSrv('${obraId}','${mesKey}','${si.key}','proveedor',this.value)" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px">`:'—'}</td>
+            <td><input type="number" min="0" step="0.01" value="${stored.precio||0}"
+              onchange="setPrecioSrv('${obraId}','${mesKey}','${si.key}','precio',parseFloat(this.value)||0)"
+              style="width:100px;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
+            <td style="color:#888;font-size:10px">${si.unidad}</td>
+          </tr>`;
+        }).join('')}</tbody>
       </table>
     </div>
     <div class="srv-table" style="margin-bottom:14px">
@@ -684,6 +698,12 @@ function setPrecioExt(obraId,mesKey,key,precio){
   const item=p.ext.find(x=>x.key===key);
   if(item)item.precio=precio;
   else{const def=EXT_ITEMS.find(e=>e.key===key);if(def)p.ext.push({...def,precio});}
+}
+function setPrecioSrv(obraId,mesKey,key,field,val){
+  const p=getPreciosObraMes(obraId,mesKey);
+  let item=p.servicios.find(x=>x.key===key);
+  if(!item){const def=ALL_SRV_ITEMS.find(s=>s.key===key);item={...def,precio:0,proveedor:''};p.servicios.push(item);}
+  item[field]=val;
 }
 function setPrecioEpp(obraId,mesKey,key,precio){
   const p=getPreciosObraMes(obraId,mesKey);
@@ -778,10 +798,12 @@ function calcCostoObra(obraId, obra, mesKey){
     const fechaMes=ext.venc?ext.venc.slice(0,7):null;
     if(fechaMes!==mesKey)return;
     const motivo=ext.motivo||'compra';
-    const precio=motivo==='recarga'?pRecarga.precio:pCompra.precio;
-    const srvKey=motivo==='recarga'?'ext_recarga':'ext_compra';
+    // Find price by exact tipo+motivo key
+    const srvKey='ext_'+(ext.tipo||'ABC 10kg').replace(/\s/g,'_').replace(/\//g,'_')+'_'+motivo;
+    const pItem=(p.servicios||[]).find(x=>x.key===srvKey)||{precio:0};
+    const precio=pItem.precio;
     srvMap[srvKey]=(srvMap[srvKey]||0)+precio;
-    if(precio>0)detalle.push({tipo:'Extintor',item:(motivo==='recarga'?'Recarga':'Compra')+' — '+ext.tipo+(ext.prov?' ('+ext.prov+')':''),cant:1,precio,total:precio});
+    if(precio>0)detalle.push({tipo:'Extintor',item:(motivo==='recarga'?'Recarga':'Compra')+' '+ext.tipo+(ext.prov?' ('+ext.prov+')':''),cant:1,precio,total:precio});
   });
 
   const newSrvTotal=Object.values(srvMap).reduce((a,b)=>a+b,0);
@@ -805,7 +827,7 @@ function renderAnalisisObra(){
     <div class="srv-table" style="margin-top:14px">
       <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;font-size:12px;font-weight:700">Desglose de servicios</div>
       <table><thead><tr>${SRV_ITEMS.map(s=>`<th>${s.label}</th>`).join('')}</tr></thead>
-      <tbody><tr>${SRV_ITEMS.map(s=>`<td style="font-weight:600">${fmtMoney(c.servicios[s.key]||0)}</td>`).join('')}</tr></tbody></table>
+      <tbody><tr>${ALL_SRV_ITEMS.map(s=>`<td style="font-weight:600;background:${s.key.startsWith('ext_')?'#fef9f5':''}">${fmtMoney(c.servicios[s.key]||0)}</td>`).join('')}</tr></tbody></table>
     </div>
     ${c.detalle.length?`<div class="srv-table" style="margin-top:14px">
       <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;font-size:12px;font-weight:700">Entregas EPP y Ropa este mes</div>
@@ -822,7 +844,7 @@ function renderComparar(){
   const rows=OBRAS_CONFIG.map(cfg=>({
     cfg,
     c:calcCostoObra(cfg.id,obrasData[cfg.id],mesKey),
-    p:getPreciosMes(cfg.id,mesKey)||{servicios:SRV_ITEMS.map(s=>({...s,precio:0})),epp:EPP_DEFAULT.map(e=>({...e,precio:0})),ropa:ROPA_ITEMS.map(r=>({...r,precio:0}))}
+    p:getPreciosMes(cfg.id,mesKey)||{servicios:ALL_SRV_ITEMS.map(s=>({...s,precio:0})),epp:EPP_DEFAULT.map(e=>({...e,precio:0})),ropa:ROPA_ITEMS.map(r=>({...r,precio:0}))}
   }));
   const granTotal=rows.reduce((a,r)=>a+r.c.total,0);
 
@@ -871,7 +893,7 @@ function renderComparar(){
 
   const n = rows.length + 2; // obras + item label + total
 
-  const srvRows = SRV_ITEMS.map(s=>buildRow(s.label, r=>(r.c.servicios[s.key]||0), '#fef9f5')).join('');
+  const srvRows = ALL_SRV_ITEMS.map(s=>buildRow(s.label, r=>(r.c.servicios[s.key]||0), '#fef9f5')).join('');
   const eppRows = EPP_DEFAULT.map(e=>buildRow(e.label, r=>eppCostForLabel(r,e.label), '#f8f5fc')).join('');
   const ropaRows = ROPA_ITEMS.map(ri=>buildRow(ri.label, r=>ropaCostForKey(r,ri.key), '#f5faf6')).join('');
 
