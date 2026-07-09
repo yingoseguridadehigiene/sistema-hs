@@ -758,27 +758,32 @@ function calcCostoObra(obraId, obra, mesKey){
     });
   });
 
-  // Extintores: agrupados dentro de srvMap
-  Object.keys(obra.servicios||{}).forEach(wk=>{
-    const[y,w]=wk.split('-W').map(Number);
-    const jan4=new Date(y,0,4);const d=new Date(jan4);
-    d.setDate(jan4.getDate()-((jan4.getDay()+6)%7)+(w-1)*7);
-    const mk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    if(mk!==mesKey)return;
-    const srv=obra.servicios[wk];
-    const exts=srv.extintores||[];
-    if(exts.length>0){
-      const pCompra=(p.servicios||[]).find(x=>x.key==='ext_compra')||{precio:0};
-      const pRecarga=(p.servicios||[]).find(x=>x.key==='ext_recarga')||{precio:0};
-      exts.forEach(ext=>{
-        const motivo=ext.motivo||'compra';
-        const precio=motivo==='recarga'?pRecarga.precio:pCompra.precio;
-        const srvKey=motivo==='recarga'?'ext_recarga':'ext_compra';
-        srvMap[srvKey]=(srvMap[srvKey]||0)+precio;
-        if(precio>0)detalle.push({tipo:'Extintor',item:(motivo==='recarga'?'Recarga':'Compra')+' ext. '+ext.tipo,cant:1,precio,total:precio});
-      });
-    }
+  // Extintores: el costo se imputa al mes de la fecha de vencimiento de cada extintor
+  // Se recorre TODOS los registros de servicios buscando extintores cuya fecha de venc esté en mesKey
+  const extVisto = new Set(); // evitar duplicar si el mismo extintor aparece en múltiples semanas
+  const pCompra=(p.servicios||[]).find(x=>x.key==='ext_compra')||{precio:0};
+  const pRecarga=(p.servicios||[]).find(x=>x.key==='ext_recarga')||{precio:0};
+
+  // Collect all unique extintores across all weeks (use venc+tipo+motivo as key)
+  const allExts=[];
+  Object.values(obra.servicios||{}).forEach(srv=>{
+    (srv.extintores||[]).forEach(ext=>{
+      const uid=(ext.venc||'')+'|'+(ext.tipo||'')+'|'+(ext.motivo||'compra')+'|'+(ext.prov||'');
+      if(!extVisto.has(uid)){extVisto.add(uid);allExts.push(ext);}
+    });
   });
+
+  allExts.forEach(ext=>{
+    // Imputar al mes de la fecha de vencimiento
+    const fechaMes=ext.venc?ext.venc.slice(0,7):null;
+    if(fechaMes!==mesKey)return;
+    const motivo=ext.motivo||'compra';
+    const precio=motivo==='recarga'?pRecarga.precio:pCompra.precio;
+    const srvKey=motivo==='recarga'?'ext_recarga':'ext_compra';
+    srvMap[srvKey]=(srvMap[srvKey]||0)+precio;
+    if(precio>0)detalle.push({tipo:'Extintor',item:(motivo==='recarga'?'Recarga':'Compra')+' — '+ext.tipo+(ext.prov?' ('+ext.prov+')':''),cant:1,precio,total:precio});
+  });
+
   const newSrvTotal=Object.values(srvMap).reduce((a,b)=>a+b,0);
   return{servicios:srvMap,srvTotal:newSrvTotal,epp:costoEpp,ropa:costoRopa,total:newSrvTotal+costoEpp+costoRopa,detalle};
 }
