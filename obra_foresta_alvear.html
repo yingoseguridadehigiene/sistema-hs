@@ -504,19 +504,27 @@ function renderSrvSB(){
   const extVEl=document.getElementById('sb-ext-venc');
   if(extEl){
     const exts=srv.extintores||[];
-    extEl.textContent=exts.length>0?exts.length+' extintor'+(exts.length>1?'es':''):'No configurado';
-    if(extVEl){
+    if(!exts.length){
+      extEl.textContent='No configurado';
+      if(extVEl)extVEl.innerHTML='';
+    }else{
       const hoy=new Date();hoy.setHours(0,0,0,0);
-      const proxVenc=exts.filter(e=>e.venc).map(e=>{
-        const v=new Date(e.venc+'T00:00:00');
-        return{dias:Math.round((v-hoy)/86400000),fecha:e.venc};
-      }).sort((a,b)=>a.dias-b.dias)[0];
-      if(proxVenc){
-        if(proxVenc.dias<0){extVEl.textContent='⚠ Vencido: '+fmtD(proxVenc.fecha);extVEl.style.color='#c0392b';}
-        else if(proxVenc.dias<=7){extVEl.textContent='⚠ Vence en '+proxVenc.dias+'d: '+fmtD(proxVenc.fecha);extVEl.style.color='#c0392b';}
-        else if(proxVenc.dias<=30){extVEl.textContent='⚡ Próx. venc: '+fmtD(proxVenc.fecha);extVEl.style.color='#e67e22';}
-        else{extVEl.textContent='Próx. venc: '+fmtD(proxVenc.fecha);extVEl.style.color='#4a7a50';}
-      }else{extVEl.textContent='Sin fechas cargadas';extVEl.style.color='#6a8aaa';}
+      extEl.textContent=exts.length+' extintor'+(exts.length>1?'es':'');
+      if(extVEl){
+        extVEl.innerHTML=exts.map((e,i)=>{
+          let vencTxt='',color='#6a8aaa';
+          if(e.venc){
+            const v=new Date(e.venc+'T00:00:00');
+            const dias=Math.round((v-hoy)/86400000);
+            if(dias<0){vencTxt='⚠ Vencido '+fmtD(e.venc);color='#c0392b';}
+            else if(dias<=7){vencTxt='⚠ Vence en '+dias+'d ('+fmtD(e.venc)+')';color='#c0392b';}
+            else if(dias<=30){vencTxt='⚡ Vence '+fmtD(e.venc);color='#e67e22';}
+            else{vencTxt='Vence: '+fmtD(e.venc);color='#4a7a50';}
+          }else{vencTxt='Sin vencimiento';color='#6a8aaa';}
+          const motivo=e.motivo==='recarga'?'Recarga':'Compra';
+          return '<div style="font-size:9px;margin-top:3px;color:'+color+'">Ext.'+(i+1)+' ('+e.tipo+'/'+motivo+'): '+vencTxt+'</div>';
+        }).join('');
+      }
     }
   }
   // Personal count
@@ -1100,29 +1108,36 @@ document.getElementById('operario-modal').addEventListener('click',function(e){i
 let extRows = [];
 
 function renderExtList(){
-  const wrap = document.getElementById('ext-list');
-  if(!wrap) return;
-  if(!extRows.length){
-    wrap.innerHTML = '<div style="font-size:11px;color:#bbb;padding:4px 0">Sin extintores cargados. Usá "+ Agregar".</div>';
-    return;
-  }
-  wrap.innerHTML = extRows.map((e,i) => `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 30px;gap:6px;margin-bottom:6px;align-items:center">
-      <div>
-        <div style="font-size:9px;color:#888;margin-bottom:2px">Tipo</div>
-        <select onchange="extRows[${i}].tipo=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px">
-          ${['ABC 10kg','ABC 5kg','CO2','Agua'].map(t=>`<option value="${t}" ${e.tipo===t?'selected':''}>${t}</option>`).join('')}
-        </select>
+  const wrap=document.getElementById('ext-list');
+  if(!wrap)return;
+  if(!extRows.length){wrap.innerHTML='<div style="font-size:11px;color:#bbb;padding:4px 0">Sin extintores cargados. Usá "+ Agregar".</div>';return;}
+  wrap.innerHTML=extRows.map((e,i)=>`
+    <div style="background:#f9fafb;border:1px solid #e8eaf0;border-radius:7px;padding:8px 10px;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;color:#444;margin-bottom:6px">Extintor ${i+1}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 30px;gap:6px;align-items:end">
+        <div>
+          <div style="font-size:9px;color:#888;margin-bottom:2px">Tipo</div>
+          <select onchange="extRows[${i}].tipo=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px">
+            ${['ABC 10kg','ABC 5kg','CO2','Agua'].map(t=>`<option value="${t}" ${e.tipo===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:9px;color:#888;margin-bottom:2px">Motivo</div>
+          <select onchange="extRows[${i}].motivo=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px">
+            <option value="compra" ${(!e.motivo||e.motivo==='compra')?'selected':''}>Compra</option>
+            <option value="recarga" ${e.motivo==='recarga'?'selected':''}>Recarga</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:9px;color:#888;margin-bottom:2px">Vencimiento</div>
+          <input type="date" value="${e.venc||''}" onchange="extRows[${i}].venc=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px">
+        </div>
+        <div>
+          <div style="font-size:9px;color:#888;margin-bottom:2px">Proveedor</div>
+          <input type="text" value="${e.prov||''}" placeholder="Proveedor" onchange="extRows[${i}].prov=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px">
+        </div>
+        <button onclick="extRows.splice(${i},1);renderExtList()" style="background:#fde8e8;color:#c0392b;border:none;border-radius:5px;height:30px;cursor:pointer">✕</button>
       </div>
-      <div>
-        <div style="font-size:9px;color:#888;margin-bottom:2px">Vencimiento</div>
-        <input type="date" value="${e.venc||''}" onchange="extRows[${i}].venc=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px">
-      </div>
-      <div>
-        <div style="font-size:9px;color:#888;margin-bottom:2px">Proveedor / recarga</div>
-        <input type="text" value="${e.prov||''}" placeholder="Proveedor" onchange="extRows[${i}].prov=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px">
-      </div>
-      <button onclick="extRows.splice(${i},1);renderExtList()" style="background:#fde8e8;color:#c0392b;border:none;border-radius:5px;height:30px;cursor:pointer;margin-top:14px">✕</button>
     </div>`).join('');
 }
 

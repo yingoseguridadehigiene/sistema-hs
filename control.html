@@ -771,11 +771,13 @@ function calcCostoObra(obraId, obra, mesKey){
     const exts=srv.extintores||[];
     if(exts.length>0){
       const pCompra=(p.ext||[]).find(x=>x.key==='ext_compra')||{precio:0};
-      // Count extintores that have venc in this month (new purchase) vs others (recarga)
+      const pRecarga=(p.ext||[]).find(x=>x.key==='ext_recarga')||{precio:0};
       exts.forEach(ext=>{
-        if(ext.venc&&ext.venc.startsWith(mesKey)){
-          costoExt+=pCompra.precio;
-          detalle.push({tipo:'Extintor',item:'Compra ext. '+ext.tipo,cant:1,precio:pCompra.precio,total:pCompra.precio});
+        const motivo=ext.motivo||'compra';
+        const precio=motivo==='recarga'?pRecarga.precio:pCompra.precio;
+        if(precio>0){
+          costoExt+=precio;
+          detalle.push({tipo:'Extintor',item:(motivo==='recarga'?'Recarga':'Compra')+' ext. '+ext.tipo,cant:1,precio,total:precio});
         }
       });
     }
