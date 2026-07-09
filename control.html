@@ -494,11 +494,13 @@ function renderServicios() {
 const CC_KEY = 'hs_costos_v3';
 
 const SRV_ITEMS = [
-  {key:'banio_u',    label:'Baño químico',          unidad:'unidad/mes'},
-  {key:'banio_limp', label:'Limpieza baño/semana',  unidad:'limpieza'},
-  {key:'agua_d',     label:'Dispenser agua',         unidad:'unidad/mes'},
-  {key:'agua_b',     label:'Bidón de agua',          unidad:'bidón'},
-  {key:'alarma',     label:'Alarma',                 unidad:'mes'},
+  {key:'banio_u',    label:'Baño químico',           unidad:'unidad/mes'},
+  {key:'banio_limp', label:'Limpieza baño/semana',   unidad:'limpieza'},
+  {key:'agua_d',     label:'Dispenser agua',          unidad:'unidad/mes'},
+  {key:'agua_b',     label:'Bidón de agua',           unidad:'bidón'},
+  {key:'alarma',     label:'Alarma',                  unidad:'mes'},
+  {key:'ext_compra', label:'Extintor — Compra',       unidad:'unidad'},
+  {key:'ext_recarga',label:'Extintor — Recarga',      unidad:'unidad'},
 ];
 const ROPA_ITEMS = [
   {key:'pantalon', label:'Pantalón de trabajo'},
@@ -580,9 +582,6 @@ function getPreciosObraMes(obraId, mesKey) {
     if(!p.epp.find(x=>x.key===def.key))
       p.epp.push({...def,precio:0});
   });
-  // Extintor
-  if (!p.ext) p.ext = EXT_ITEMS.map(i=>({...i,precio:0}));
-  EXT_ITEMS.forEach(ei=>{if(!p.ext.find(x=>x.key===ei.key))p.ext.push({...ei,precio:0});});
   return p;
 }
 
@@ -759,8 +758,7 @@ function calcCostoObra(obraId, obra, mesKey){
     });
   });
 
-  // Extintores: count per month from servicios
-  let costoExt=0;
+  // Extintores: agrupados dentro de srvMap
   Object.keys(obra.servicios||{}).forEach(wk=>{
     const[y,w]=wk.split('-W').map(Number);
     const jan4=new Date(y,0,4);const d=new Date(jan4);
@@ -770,19 +768,19 @@ function calcCostoObra(obraId, obra, mesKey){
     const srv=obra.servicios[wk];
     const exts=srv.extintores||[];
     if(exts.length>0){
-      const pCompra=(p.ext||[]).find(x=>x.key==='ext_compra')||{precio:0};
-      const pRecarga=(p.ext||[]).find(x=>x.key==='ext_recarga')||{precio:0};
+      const pCompra=(p.servicios||[]).find(x=>x.key==='ext_compra')||{precio:0};
+      const pRecarga=(p.servicios||[]).find(x=>x.key==='ext_recarga')||{precio:0};
       exts.forEach(ext=>{
         const motivo=ext.motivo||'compra';
         const precio=motivo==='recarga'?pRecarga.precio:pCompra.precio;
-        if(precio>0){
-          costoExt+=precio;
-          detalle.push({tipo:'Extintor',item:(motivo==='recarga'?'Recarga':'Compra')+' ext. '+ext.tipo,cant:1,precio,total:precio});
-        }
+        const srvKey=motivo==='recarga'?'ext_recarga':'ext_compra';
+        srvMap[srvKey]=(srvMap[srvKey]||0)+precio;
+        if(precio>0)detalle.push({tipo:'Extintor',item:(motivo==='recarga'?'Recarga':'Compra')+' ext. '+ext.tipo,cant:1,precio,total:precio});
       });
     }
   });
-  return{servicios:srvMap,srvTotal,epp:costoEpp,ropa:costoRopa,ext:costoExt,total:srvTotal+costoEpp+costoRopa+costoExt,detalle};
+  const newSrvTotal=Object.values(srvMap).reduce((a,b)=>a+b,0);
+  return{servicios:srvMap,srvTotal:newSrvTotal,epp:costoEpp,ropa:costoRopa,total:newSrvTotal+costoEpp+costoRopa,detalle};
 }
 
 function renderAnalisisObra(){
@@ -797,7 +795,6 @@ function renderAnalisisObra(){
       <div class="estado-card"><div class="estado-n" style="color:#e67e22">${fmtMoney(c.srvTotal)}</div><div class="estado-l">Servicios</div></div>
       <div class="estado-card"><div class="estado-n" style="color:#7c3fa0">${fmtMoney(c.epp)}</div><div class="estado-l">EPP</div></div>
       <div class="estado-card"><div class="estado-n" style="color:#1a6b2e">${fmtMoney(c.ropa)}</div><div class="estado-l">Ropa de trabajo</div></div>
-      <div class="estado-card"><div class="estado-n" style="color:#c0392b">${fmtMoney(c.ext||0)}</div><div class="estado-l">Extintores</div></div>
       <div class="estado-card"><div class="estado-n" style="color:${cfg.color}">${fmtMoney(c.total)}</div><div class="estado-l">Total del mes</div></div>
     </div>
     <div class="srv-table" style="margin-top:14px">
@@ -895,16 +892,6 @@ function renderComparar(){
             <td style="padding:6px 12px;font-size:11px">Subtotal servicios</td>
             ${srvTotal.map(v=>`<td style="text-align:center;font-size:11px">${fmtMoney(v)}</td>`).join('')}
             <td style="text-align:center;font-size:11px">${fmtMoney(srvTotal.reduce((a,b)=>a+b,0))}</td>
-          </tr>
-          ${buildSectionHeader('🧯 Extintores','#c0392b','#fde8e8',n)}
-          ${EXT_ITEMS.map(ei=>buildRow(ei.label, r=>{
-            const pE=(r.p.ext||[]).find(x=>x.key===ei.key)||{precio:0};
-            return(r.c.ext||0);
-          },'#fde8e8')).join('')}
-          <tr style="background:#fde8e8;font-weight:700">
-            <td style="padding:6px 12px;font-size:11px">Subtotal extintores</td>
-            ${rows.map(r=>`<td style="text-align:center;font-size:11px">${fmtMoney(r.c.ext||0)}</td>`).join('')}
-            <td style="text-align:center;font-size:11px">${fmtMoney(rows.reduce((a,r)=>a+(r.c.ext||0),0))}</td>
           </tr>
           ${buildSectionHeader('🦺 EPP','#7c3fa0','#ede9f6',n)}
           ${eppRows}
