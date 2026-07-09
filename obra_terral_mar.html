@@ -166,6 +166,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
       <div class="sb-srv-val" id="sb-alarma">—</div>
       <div class="sb-srv-prov" id="sb-alarma-prov">—</div>
     </div>
+    <div class="sb-srv-item">
+      <div class="sb-srv-name">🧯 Extintores</div>
+      <div class="sb-srv-val" id="sb-ext-cant">—</div>
+      <div class="sb-srv-prov" id="sb-ext-venc"></div>
+    </div>
     <button class="sb-edit" style="color:#e67e22;border-color:#e67e22;margin-top:5px" onclick="openSrvSemana()">✎ Editar servicios esta semana</button>
   </div>
 
@@ -248,6 +253,35 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
         </select>
       </div>
       <div class="field"><label>🚨 Alarma — Proveedor</label><input type="text" id="srv-alarma-p" placeholder="Ej: Securitas"></div>
+      <div class="field" style="border-top:1px solid #f0f2f6;padding-top:12px;margin-top:4px">
+        <label>🧯 Extintores</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+          <div>
+            <div style="font-size:10px;color:#888;margin-bottom:3px">Cantidad</div>
+            <input type="number" id="srv-ext-cant" min="0" placeholder="0">
+          </div>
+          <div>
+            <div style="font-size:10px;color:#888;margin-bottom:3px">Tipo</div>
+            <select id="srv-ext-tipo">
+              <option value="ABC 10kg">ABC 10kg</option>
+              <option value="ABC 5kg">ABC 5kg</option>
+              <option value="CO2">CO2</option>
+              <option value="Agua">Agua</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:10px;color:#888;margin-bottom:3px">Vencimiento</div>
+            <input type="date" id="srv-ext-venc">
+          </div>
+          <div>
+            <div style="font-size:10px;color:#888;margin-bottom:3px">Proveedor</div>
+            <input type="text" id="srv-ext-prov" placeholder="Ej: Extintores ABC">
+          </div>
+        </div>
+      </div>
+      <div style="background:#fffbe6;border:1px solid #ffe58f;border-radius:6px;padding:8px 10px;margin:8px 0;font-size:10px;color:#856404">
+        ℹ Actualizá estos datos una vez por mes o cuando cambie el estado del servicio.
+      </div>
       <div class="field"><label>Observaciones</label><textarea id="srv-obs" style="min-height:50px;width:100%;border:1px solid #d0d4db;border-radius:7px;padding:8px;font-size:12px;resize:vertical"></textarea></div>
     </div>
     <div class="mfoot">
@@ -484,6 +518,23 @@ function renderSrvSB(){
   document.getElementById('sb-banio-prov').textContent=srv.banio_prov?'Prov: '+srv.banio_prov:'Sin proveedor';
   document.getElementById('sb-agua-prov').textContent=srv.agua_prov?'Prov: '+srv.agua_prov:'Sin proveedor';
   document.getElementById('sb-alarma-prov').textContent=srv.alarma_p?'Prov: '+srv.alarma_p:'Sin proveedor';
+  // Extintor
+  const extEl=document.getElementById('sb-ext-cant');
+  const extVEl=document.getElementById('sb-ext-venc');
+  if(extEl){
+    extEl.textContent=srv.ext_cant>0?srv.ext_cant+' ud ('+srv.ext_tipo+')':'No configurado';
+    if(extVEl){
+      if(srv.ext_venc){
+        const venc=new Date(srv.ext_venc+'T00:00:00');
+        const hoy=new Date(); hoy.setHours(0,0,0,0);
+        const dias=Math.round((venc-hoy)/86400000);
+        if(dias<0){extVEl.textContent='⚠ Vencido el '+fmtD(srv.ext_venc);extVEl.style.color='#c0392b';}
+        else if(dias<=7){extVEl.textContent='⚠ Vence en '+dias+' días ('+fmtD(srv.ext_venc)+')';extVEl.style.color='#c0392b';}
+        else if(dias<=30){extVEl.textContent='⚡ Vence '+fmtD(srv.ext_venc);extVEl.style.color='#e67e22';}
+        else{extVEl.textContent='Vence: '+fmtD(srv.ext_venc);extVEl.style.color='#4a7a50';}
+      }else{extVEl.textContent='Sin fecha de vencimiento';extVEl.style.color='#6a8aaa';}
+    }
+  }
   // Personal count
   const pCount=(obra.personal||[]).length;
   const pEl=document.getElementById('sb-personal-count');
@@ -687,6 +738,10 @@ function openSrvSemana(){
   document.getElementById('srv-agua-prov').value=srv.agua_prov||'';
   document.getElementById('srv-alarma-e').value=srv.alarma_e||'No instalada';
   document.getElementById('srv-alarma-p').value=srv.alarma_p||'';
+  document.getElementById('srv-ext-cant').value=srv.ext_cant||0;
+  document.getElementById('srv-ext-tipo').value=srv.ext_tipo||'ABC 10kg';
+  document.getElementById('srv-ext-venc').value=srv.ext_venc||'';
+  document.getElementById('srv-ext-prov').value=srv.ext_prov||'';
   document.getElementById('srv-obs').value=srv.obs||'';
   document.getElementById('srv-modal').classList.add('open');
 }
@@ -703,6 +758,10 @@ function guardarSrv(){
     agua_prov:document.getElementById('srv-agua-prov').value,
     alarma_e:document.getElementById('srv-alarma-e').value,
     alarma_p:document.getElementById('srv-alarma-p').value,
+    ext_cant:parseInt(document.getElementById('srv-ext-cant').value)||0,
+    ext_tipo:document.getElementById('srv-ext-tipo').value,
+    ext_venc:document.getElementById('srv-ext-venc').value,
+    ext_prov:document.getElementById('srv-ext-prov').value,
     obs:document.getElementById('srv-obs').value
   };
   closeSrvModal();renderSrvSB();renderTL();_saveData();showSaveOK();

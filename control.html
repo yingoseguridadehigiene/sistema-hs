@@ -454,6 +454,16 @@ function renderServicios() {
       <td>${aguaProv}</td>
       <td><span class="srv-tag ${alarmaTag}">${alarmaE}</span></td>
       <td>${alarmaP}</td>
+      <td>${srv.ext_cant>0?(srv.ext_cant+' ud '+( srv.ext_tipo||'')):'—'}</td>
+      <td>${(() => {
+        if(!srv.ext_venc) return '—';
+        const venc=new Date(srv.ext_venc+'T00:00:00');
+        const hoy=new Date(); hoy.setHours(0,0,0,0);
+        const dias=Math.round((venc-hoy)/86400000);
+        if(dias<0) return '<span class="srv-tag srv-warn">⚠ Vencido '+fmtD(srv.ext_venc)+'</span>';
+        if(dias<=7) return '<span class="srv-tag srv-warn">⚠ '+dias+'d ('+fmtD(srv.ext_venc)+')</span>';
+        return fmtD(srv.ext_venc);
+      })()}</td>
     </tr>`;
   }).join('');
 
@@ -469,6 +479,8 @@ function renderServicios() {
         <th>Proveedor agua</th>
         <th>🚨 Alarma</th>
         <th>Proveedor alarma</th>
+        <th>🧯 Extintores</th>
+        <th>Vencimiento</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
