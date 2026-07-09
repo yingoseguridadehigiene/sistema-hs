@@ -505,6 +505,10 @@ const ROPA_ITEMS = [
   {key:'camisa',   label:'Camisa de trabajo'},
   {key:'botin',    label:'Botín de seguridad'},
 ];
+const EXT_ITEMS = [
+  {key:'ext_compra',  label:'Extintor — Compra',   unidad:'unidad'},
+  {key:'ext_recarga', label:'Extintor — Recarga',   unidad:'unidad'},
+];
 const EPP_DEFAULT = [
   {key:'casco',           label:'Casco de seguridad'},
   {key:'lentes',          label:'Lentes de seguridad'},
@@ -576,6 +580,9 @@ function getPreciosObraMes(obraId, mesKey) {
     if(!p.epp.find(x=>x.key===def.key))
       p.epp.push({...def,precio:0});
   });
+  // Extintor
+  if (!p.ext) p.ext = EXT_ITEMS.map(i=>({...i,precio:0}));
+  EXT_ITEMS.forEach(ei=>{if(!p.ext.find(x=>x.key===ei.key))p.ext.push({...ei,precio:0});});
   return p;
 }
 
@@ -634,6 +641,24 @@ function renderPreciosObra() {
         </tr>`).join('')}</tbody>
       </table>
     </div>
+    <div class="srv-table" style="margin-bottom:14px">
+      <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6">
+        <span style="font-size:12px;font-weight:700;color:${cfg.color}">🧯 Extintores — ${cfg.nombre}</span>
+      </div>
+      <table>
+        <thead><tr><th>Ítem</th><th>Precio unit.</th><th>Unidad</th></tr></thead>
+        <tbody>${EXT_ITEMS.map((e,i)=>{
+          const stored=(p.ext||[]).find(x=>x.key===e.key)||{precio:0};
+          return `<tr>
+            <td style="font-size:11px">${e.label}</td>
+            <td><input type="number" min="0" step="0.01" value="${stored.precio||0}"
+              onchange="setPrecioExt('${obraId}','${mesKey}','${e.key}',parseFloat(this.value)||0)"
+              style="width:100px;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
+            <td style="color:#888;font-size:10px">${e.unidad}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
     <div class="srv-table">
       <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6">
         <span style="font-size:12px;font-weight:700;color:${cfg.color}">🦺 EPP — ${cfg.nombre}</span>
@@ -654,6 +679,13 @@ function renderPreciosObra() {
   `;
 }
 
+function setPrecioExt(obraId,mesKey,key,precio){
+  const p=getPreciosObraMes(obraId,mesKey);
+  if(!p.ext)p.ext=EXT_ITEMS.map(i=>({...i,precio:0}));
+  const item=p.ext.find(x=>x.key===key);
+  if(item)item.precio=precio;
+  else{const def=EXT_ITEMS.find(e=>e.key===key);if(def)p.ext.push({...def,precio});}
+}
 function setPrecioEpp(obraId,mesKey,key,precio){
   const p=getPreciosObraMes(obraId,mesKey);
   const item=p.epp.find(x=>x.key===key);
@@ -727,7 +759,28 @@ function calcCostoObra(obraId, obra, mesKey){
     });
   });
 
-  return{servicios:srvMap,srvTotal,epp:costoEpp,ropa:costoRopa,total:srvTotal+costoEpp+costoRopa,detalle};
+  // Extintores: count per month from servicios
+  let costoExt=0;
+  Object.keys(obra.servicios||{}).forEach(wk=>{
+    const[y,w]=wk.split('-W').map(Number);
+    const jan4=new Date(y,0,4);const d=new Date(jan4);
+    d.setDate(jan4.getDate()-((jan4.getDay()+6)%7)+(w-1)*7);
+    const mk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(mk!==mesKey)return;
+    const srv=obra.servicios[wk];
+    const exts=srv.extintores||[];
+    if(exts.length>0){
+      const pCompra=(p.ext||[]).find(x=>x.key==='ext_compra')||{precio:0};
+      // Count extintores that have venc in this month (new purchase) vs others (recarga)
+      exts.forEach(ext=>{
+        if(ext.venc&&ext.venc.startsWith(mesKey)){
+          costoExt+=pCompra.precio;
+          detalle.push({tipo:'Extintor',item:'Compra ext. '+ext.tipo,cant:1,precio:pCompra.precio,total:pCompra.precio});
+        }
+      });
+    }
+  });
+  return{servicios:srvMap,srvTotal,epp:costoEpp,ropa:costoRopa,ext:costoExt,total:srvTotal+costoEpp+costoRopa+costoExt,detalle};
 }
 
 function renderAnalisisObra(){
@@ -742,6 +795,7 @@ function renderAnalisisObra(){
       <div class="estado-card"><div class="estado-n" style="color:#e67e22">${fmtMoney(c.srvTotal)}</div><div class="estado-l">Servicios</div></div>
       <div class="estado-card"><div class="estado-n" style="color:#7c3fa0">${fmtMoney(c.epp)}</div><div class="estado-l">EPP</div></div>
       <div class="estado-card"><div class="estado-n" style="color:#1a6b2e">${fmtMoney(c.ropa)}</div><div class="estado-l">Ropa de trabajo</div></div>
+      <div class="estado-card"><div class="estado-n" style="color:#c0392b">${fmtMoney(c.ext||0)}</div><div class="estado-l">Extintores</div></div>
       <div class="estado-card"><div class="estado-n" style="color:${cfg.color}">${fmtMoney(c.total)}</div><div class="estado-l">Total del mes</div></div>
     </div>
     <div class="srv-table" style="margin-top:14px">
@@ -840,6 +894,16 @@ function renderComparar(){
             ${srvTotal.map(v=>`<td style="text-align:center;font-size:11px">${fmtMoney(v)}</td>`).join('')}
             <td style="text-align:center;font-size:11px">${fmtMoney(srvTotal.reduce((a,b)=>a+b,0))}</td>
           </tr>
+          ${buildSectionHeader('🧯 Extintores','#c0392b','#fde8e8',n)}
+          ${EXT_ITEMS.map(ei=>buildRow(ei.label, r=>{
+            const pE=(r.p.ext||[]).find(x=>x.key===ei.key)||{precio:0};
+            return(r.c.ext||0);
+          },'#fde8e8')).join('')}
+          <tr style="background:#fde8e8;font-weight:700">
+            <td style="padding:6px 12px;font-size:11px">Subtotal extintores</td>
+            ${rows.map(r=>`<td style="text-align:center;font-size:11px">${fmtMoney(r.c.ext||0)}</td>`).join('')}
+            <td style="text-align:center;font-size:11px">${fmtMoney(rows.reduce((a,r)=>a+(r.c.ext||0),0))}</td>
+          </tr>
           ${buildSectionHeader('🦺 EPP','#7c3fa0','#ede9f6',n)}
           ${eppRows}
           <tr style="background:#ede9f6;font-weight:700">
@@ -856,8 +920,8 @@ function renderComparar(){
           </tr>
           <tr style="background:#1a2332;color:#fff;font-weight:800">
             <td style="padding:9px 12px;font-size:12px">TOTAL GENERAL</td>
-            ${grandTotals.map(v=>`<td style="text-align:center;font-size:12px">${fmtMoney(v)}</td>`).join('')}
-            <td style="text-align:center;font-size:12px">${fmtMoney(grandTotals.reduce((a,b)=>a+b,0))}</td>
+            ${rows.map(r=>`<td style="text-align:center;font-size:12px">${fmtMoney(r.c.total)}</td>`).join('')}
+            <td style="text-align:center;font-size:12px">${fmtMoney(rows.reduce((a,r)=>a+r.c.total,0))}</td>
           </tr>
         </tbody>
       </table>
