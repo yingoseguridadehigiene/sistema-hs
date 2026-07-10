@@ -855,50 +855,57 @@ function renderAnalisisObra(){
   const mesKey=document.getElementById('cc-mes-sel').value;
   const obra=obrasData[obraId];
   const cfg=OBRAS_CONFIG.find(o=>o.id===obraId);
-  if(!obra){document.getElementById('cc-analisis-content').innerHTML='<div class="no-data" style="padding:30px;text-align:center">Sin datos para esta obra.</div>';return;}
+  if(!obra){
+    document.getElementById('cc-analisis-content').innerHTML='<div class="no-data" style="padding:30px;text-align:center">Sin datos para esta obra.</div>';
+    return;
+  }
   const c=calcCostoObra(obraId,obra,mesKey);
   const presupuesto=getPresupuesto(obraId);
-  document.getElementById('cc-analisis-content').innerHTML=`
-    ${presupuesto>0?`<div style="background:#1a2332;border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-      <div style="flex:1;min-width:140px"><div style="font-size:10px;color:#6a8aaa;text-transform:uppercase">Presupuesto</div><div style="font-size:22px;font-weight:800;color:#fff">${fmtMoney(presupuesto)}</div></div>
-      <div style="color:#6a8aaa;font-size:20px">−</div>
-      <div style="flex:1;min-width:140px"><div style="font-size:10px;color:#6a8aaa;text-transform:uppercase">Gasto del mes</div><div style="font-size:22px;font-weight:800;color:#e67e22">${fmtMoney(c.total)}</div></div>
-      <div style="color:#6a8aaa;font-size:20px">=</div>
-      <div style="flex:1;min-width:140px"><div style="font-size:10px;color:#6a8aaa;text-transform:uppercase">${c.total>presupuesto?"⚠ Excedido":"Saldo disponible"}</div><div style="font-size:22px;font-weight:800;color:${c.total>presupuesto?"#c0392b":"#1a6b2e"}">${fmtMoney(Math.abs(presupuesto-c.total))}</div></div>
-    </div>`:""}
-    <div class="estado-grid" style="grid-template-columns:repeat(4,1fr)">
-      <div class="estado-card"><div class="estado-n" style="color:#e67e22">${fmtMoney(c.srvTotal)}</div><div class="estado-l">Servicios</div></div>
-      <div class="estado-card"><div class="estado-n" style="color:#7c3fa0">${fmtMoney(c.epp)}</div><div class="estado-l">EPP</div></div>
-      <div class="estado-card"><div class="estado-n" style="color:#1a6b2e">${fmtMoney(c.ropa)}</div><div class="estado-l">Ropa de trabajo</div></div>
-      <div class="estado-card"><div class="estado-n" style="color:${cfg.color}">${fmtMoney(c.total)}</div><div class="estado-l">Total del mes</div></div>
-    </div>
-    <div class="srv-table" style="margin-top:14px;overflow-x:auto">
-      <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;font-size:12px;font-weight:700">Desglose de servicios</div>
-      <table style="min-width:500px">
-        <thead>
-          <tr>
-            ${SRV_ITEMS.map(s=>`<th rowspan="2" style="vertical-align:bottom;font-size:10px">${s.label}</th>`).join("")}
-            <th colspan="${EXT_SRV_ITEMS.length}" style="background:#fde8e8;color:#c0392b;text-align:center;border-left:2px solid #e0b0b0;font-size:10px">🧯 Extintores</th>
-          </tr>
-          <tr style="background:#fde8e8">
-            ${EXT_SRV_ITEMS.map((e,i)=>`<th style="font-size:9px;white-space:nowrap;${i===0?"border-left:2px solid #e0b0b0":""}">${e.label.replace("Extintor ","")}</th>`).join("")}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            ${SRV_ITEMS.map(s=>`<td style="font-weight:600;text-align:center;font-size:11px">${fmtMoney(c.servicios[s.key]||0)}</td>`).join("")}
-            ${EXT_SRV_ITEMS.map((e,i)=>`<td style="font-weight:600;text-align:center;font-size:11px;background:#fef9f5;${i===0?"border-left:2px solid #e0b0b0":""}">${fmtMoney(c.servicios[e.key]||0)}</td>`).join("")}
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    ${c.detalle.length?`<div class="srv-table" style="margin-top:14px">
-      <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;font-size:12px;font-weight:700">Entregas EPP y Ropa este mes</div>
-      <table><thead><tr><th>Tipo</th><th>Ítem</th><th>Cant.</th><th>Precio unit.</th><th>Total</th></tr></thead>
-      <tbody>${c.detalle.map(d=>`<tr><td>${d.tipo}</td><td>${d.item}</td><td>${d.cant}</td><td>${fmtMoney(d.precio)}</td><td>${fmtMoney(d.total)}</td></tr>`).join("")}</tbody></table>
-    </div>`:"Sin entregas de EPP o ropa este mes."}
-  `;
-}}
+
+  // Build presupuesto pill as string (no nested template literals)
+  let presupuestoPill='';
+  if(presupuesto>0){
+    const excedido=c.total>presupuesto;
+    const saldoColor=excedido?'#c0392b':'#1a6b2e';
+    const saldoLabel=excedido?'&#9888; Excedido':'Saldo disponible';
+    const saldo=fmtMoney(Math.abs(presupuesto-c.total));
+    presupuestoPill='<div style="background:#1a2332;border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:140px"><div style="font-size:10px;color:#6a8aaa;text-transform:uppercase">Presupuesto</div><div style="font-size:22px;font-weight:800;color:#fff">'+fmtMoney(presupuesto)+'</div></div>'
+      +'<div style="color:#6a8aaa;font-size:20px">&minus;</div>'
+      +'<div style="flex:1;min-width:140px"><div style="font-size:10px;color:#6a8aaa;text-transform:uppercase">Gasto del mes</div><div style="font-size:22px;font-weight:800;color:#e67e22">'+fmtMoney(c.total)+'</div></div>'
+      +'<div style="color:#6a8aaa;font-size:20px">=</div>'
+      +'<div style="flex:1;min-width:140px"><div style="font-size:10px;color:#6a8aaa;text-transform:uppercase">'+saldoLabel+'</div><div style="font-size:22px;font-weight:800;color:'+saldoColor+'">'+saldo+'</div></div>'
+      +'</div>';
+  }
+
+  // Build desglose table as string
+  const srvThs=SRV_ITEMS.map(s=>'<th rowspan="2" style="vertical-align:bottom;font-size:10px">'+s.label+'</th>').join('');
+  const extThs=EXT_SRV_ITEMS.map((e,i)=>'<th style="font-size:9px;white-space:nowrap;'+(i===0?'border-left:2px solid #e0b0b0':'')+'">'+e.label.replace('Extintor ','')+'</th>').join('');
+  const srvTds=SRV_ITEMS.map(s=>'<td style="font-weight:600;text-align:center;font-size:11px">'+fmtMoney(c.servicios[s.key]||0)+'</td>').join('');
+  const extTds=EXT_SRV_ITEMS.map((e,i)=>'<td style="font-weight:600;text-align:center;font-size:11px;background:#fef9f5;'+(i===0?'border-left:2px solid #e0b0b0':'')+'">'+fmtMoney(c.servicios[e.key]||0)+'</td>').join('');
+
+  const detallHTML=c.detalle.length
+    ?'<div class="srv-table" style="margin-top:14px"><div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;font-size:12px;font-weight:700">Entregas EPP y Ropa este mes</div>'
+      +'<table><thead><tr><th>Tipo</th><th>Item</th><th>Cant.</th><th>Precio unit.</th><th>Total</th></tr></thead><tbody>'
+      +c.detalle.map(d=>'<tr><td>'+d.tipo+'</td><td>'+d.item+'</td><td>'+d.cant+'</td><td>'+fmtMoney(d.precio)+'</td><td>'+fmtMoney(d.total)+'</td></tr>').join('')
+      +'</tbody></table></div>'
+    :'<div class="no-data" style="padding:12px">Sin entregas de EPP o ropa este mes.</div>';
+
+  document.getElementById('cc-analisis-content').innerHTML=presupuestoPill
+    +'<div class="estado-grid" style="grid-template-columns:repeat(4,1fr)">'
+    +'<div class="estado-card"><div class="estado-n" style="color:#e67e22">'+fmtMoney(c.srvTotal)+'</div><div class="estado-l">Servicios</div></div>'
+    +'<div class="estado-card"><div class="estado-n" style="color:#7c3fa0">'+fmtMoney(c.epp)+'</div><div class="estado-l">EPP</div></div>'
+    +'<div class="estado-card"><div class="estado-n" style="color:#1a6b2e">'+fmtMoney(c.ropa)+'</div><div class="estado-l">Ropa de trabajo</div></div>'
+    +'<div class="estado-card"><div class="estado-n" style="color:'+cfg.color+'">'+fmtMoney(c.total)+'</div><div class="estado-l">Total del mes</div></div>'
+    +'</div>'
+    +'<div class="srv-table" style="margin-top:14px;overflow-x:auto">'
+    +'<div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;font-size:12px;font-weight:700">Desglose de servicios</div>'
+    +'<table style="min-width:500px"><thead>'
+    +'<tr>'+srvThs+'<th colspan="'+EXT_SRV_ITEMS.length+'" style="background:#fde8e8;color:#c0392b;text-align:center;border-left:2px solid #e0b0b0;font-size:10px">&#9889; Extintores</th></tr>'
+    +'<tr style="background:#fde8e8">'+extThs+'</tr>'
+    +'</thead><tbody><tr>'+srvTds+extTds+'</tr></tbody></table></div>'
+    +detallHTML;
+}
 
 function renderComparar(){
   const mesKey=document.getElementById('cc-comp-mes-sel')?.value;
@@ -1034,10 +1041,6 @@ function populateSelectors(){
   await syncAll();
   // Auto-refresh every 30 seconds
 })();
-setInterval(syncAll, 30 * 1000);
-
-
-// Auto-refresh every 5 minutes
 setInterval(syncAll, 30 * 1000);
 </script>
 </body>
