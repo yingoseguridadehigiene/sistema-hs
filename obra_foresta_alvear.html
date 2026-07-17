@@ -725,8 +725,24 @@ function setTodayLine(){
 }
 
 function clickBar(idx,type){
-  const evs=(obra.eventos||[]).filter(e=>e.type===type);
-  if(evs[idx])alert(evs[idx].desc+(evs[idx].obs?'\n'+evs[idx].obs:'')+'\n'+fmtD(evs[idx].inicio)+' -> '+fmtD(evs[idx].fin));
+  if(type==='insp'){
+    // Find matching inspección by evento index
+    const evs=(obra.eventos||[]).filter(e=>e.type==='insp');
+    const ev=evs[idx];
+    if(!ev)return;
+    // Find in obra.inspecciones by matching inicio
+    const inspIdx=(obra.inspecciones||[]).findIndex(function(ins){return ins.inicio===ev.inicio;});
+    openInspModal(inspIdx>=0?inspIdx:null);
+    if(inspIdx<0){
+      // Pre-fill with event data
+      document.getElementById('insp-inicio').value=ev.inicio;
+      document.getElementById('insp-fin').value=ev.fin||ev.inicio;
+      document.getElementById('insp-inspector').value=ev.inspector||'';
+    }
+  } else {
+    const evs=(obra.eventos||[]).filter(e=>e.type===type);
+    if(evs[idx])alert(evs[idx].desc+(evs[idx].obs?'\n'+evs[idx].obs:'')+'\n'+fmtD(evs[idx].inicio)+' -> '+fmtD(evs[idx].fin));
+  }
 }
 
 // -- RENDER WEEK TABLE --
@@ -765,7 +781,7 @@ function renderWT(){
       </div>
       <div class="wtc">${chip(etW,'etapa')}</div>
       <div class="wtc">${chip(caW,'cap')}</div>
-      <div class="wtc">${chip(inW,'insp')}</div>
+      <div class="wtc" style="cursor:pointer" onclick="openInspFromWeek('${wkKey(wk)}')" title="Clic para abrir/editar inspección de esta semana">${chip(inW,'insp')}</div>
       <div class="wtc-btn"><button class="btn-abrir" style="${btnStyle}" onclick="openChk('${wkKey(wk)}')">Abrir</button></div>
     </div>`;
   }).join('');
@@ -1548,6 +1564,27 @@ function eliminarInsp(){
 }
 
 document.getElementById('insp-modal').addEventListener('click',function(e){if(e.target===this)closeInspModal();});
+
+
+function openInspFromWeek(wk){
+  // Find inspección matching this week
+  const inspArr=obra.inspecciones||[];
+  // Match by week key of inicio
+  const idx=inspArr.findIndex(function(ins){return wkKey(ins.inicio)===wk;});
+  if(idx>=0){
+    openInspModal(idx);
+  } else {
+    // Check if there's an evento insp this week → open new with pre-filled date
+    openInspModal(null);
+    // Set date to first day of this week
+    var parts=wk.split('-W');
+    var y=parseInt(parts[0]),w=parseInt(parts[1]);
+    var jan4=new Date(y,0,4);
+    var d=new Date(jan4);
+    d.setDate(jan4.getDate()-((jan4.getDay()+6)%7)+(w-1)*7);
+    document.getElementById('insp-inicio').value=d.toISOString().slice(0,10);
+  }
+}
 
 // -- INIT --
 (async()=>{
