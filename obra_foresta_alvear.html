@@ -1451,7 +1451,7 @@ function openInspModal(idx){
   document.getElementById('insp-fecha-sub').textContent = insp
     ? 'Inspección del ' + fmtD(insp.inicio)
     : 'Nueva inspección - ' + fmtD(hoy);
-  document.getElementById('insp-del-btn').style.display = insp ? '' : 'none';
+  document.getElementById('insp-del-btn').style.display = '';
   inspCatItems = {};
   INSP_CATS.forEach(function(cat){
     var saved = insp && insp.cats && insp.cats[cat] ? insp.cats[cat] : [];
