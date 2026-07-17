@@ -272,6 +272,44 @@ function estadoLabel(e) {
   return {ok:'Sin problemas', att:'Precaución', prob:'Problema', nr:'Sin relev.', nd:'—'}[e] || '—';
 }
 
+function buildEventosObra(obra, color){
+  if(!obra||!obra.eventos||!obra.eventos.length) return '';
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const tipos = {
+    cap:  {icon:'📚', label:'Capacitación', color:'#1a6b2e'},
+    insp: {icon:'🔍', label:'Inspección',   color:'#7c3fa0'},
+    etapa:{icon:'🏗',  label:'Etapa',        color:color},
+    plan: {icon:'📐', label:'Plan Arq.',     color:'#c0392b'},
+  };
+  // Show upcoming events in next 30 days + overdue in last 7 days
+  const evs = (obra.eventos||[]).filter(ev=>{
+    const ini = new Date(ev.inicio+'T00:00:00');
+    const fin = new Date(ev.fin+'T00:00:00');
+    const diasHastaFin = Math.round((fin-hoy)/86400000);
+    const diasDesdeIni = Math.round((hoy-ini)/86400000);
+    return diasHastaFin >= -7 && diasHastaFin <= 30;
+  }).sort((a,b)=>a.inicio.localeCompare(b.inicio));
+  if(!evs.length) return '';
+  const rows = evs.map(ev=>{
+    const t = tipos[ev.type]||{icon:'📌',label:ev.type,color:'#888'};
+    const fin = new Date(ev.fin+'T00:00:00');
+    const dias = Math.round((fin-hoy)/86400000);
+    let diasTag = '';
+    if(dias<0) diasTag='<span style="font-size:9px;background:#fde8e8;color:#c0392b;border-radius:3px;padding:1px 5px">Venció hace '+Math.abs(dias)+'d</span>';
+    else if(dias===0) diasTag='<span style="font-size:9px;background:#fde8e8;color:#c0392b;border-radius:3px;padding:1px 5px">Vence hoy</span>';
+    else if(dias<=7) diasTag='<span style="font-size:9px;background:#fffbe6;color:#856404;border-radius:3px;padding:1px 5px">Vence en '+dias+'d</span>';
+    else diasTag='<span style="font-size:9px;color:#888">hasta '+fmtD(ev.fin)+'</span>';
+    return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-top:1px solid #f0f2f6">'
+      +'<span style="font-size:10px;width:16px;text-align:center">'+t.icon+'</span>'
+      +'<span style="font-size:10px;color:'+t.color+';font-weight:600;flex:1">'+ev.desc+'</span>'
+      +diasTag
+      +'</div>';
+  }).join('');
+  return '<div style="margin-top:10px;border-top:2px solid #f0f2f6;padding-top:6px">'
+    +'<div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Próximos eventos (±30 días)</div>'
+    +rows+'</div>';
+}
+
 function renderTablero() {
   const wk = wkKey();
   const now = new Date();
@@ -312,6 +350,7 @@ function renderTablero() {
         ${pill(probC, 'Con problemas',    '#c0392b','#fde8e8')}
         ${pill(nrC,   'Sin relevamiento', '#7c3fa0','#ede9f6')}
       </div>
+      ${buildEventosObra(obra, cfg.color)}
     </div>`;
   }).join('');
 
