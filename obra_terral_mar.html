@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HyS — Terral al Mar</title>
+<title>HyS - Terral al Mar</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:hidden;background:#f4f6fa}
@@ -220,7 +220,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
       <input type="file" id="pdf-inp" accept="application/pdf" style="display:none" onchange="handlePDF(this)">
       <button class="btn-sm" style="background:#c0392b;color:#fff" onclick="document.getElementById('plan-inp').click()">📐 Plan de trabajo</button>
       <input type="file" id="plan-inp" accept="application/pdf" style="display:none" onchange="handlePlanPDF(this)">
-      <button class="btn-sm btn-green" onclick="openEvModal(null)">+ Evento</button>
+      <button class="btn-sm btn-green" onclick="openInspModal(null)">Inspección HyS</button>
       <button class="btn-sm" style="background:#856404;color:#fff" onclick="openImportJSON()">📋 Pegar análisis</button>
     </div>
     <div id="ai-s"></div>
@@ -311,7 +311,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
     <div class="mhd"><div><h3 id="ev-title">Evento</h3></div><button class="mx" onclick="closeEvModal()">✕</button></div>
     <div class="mbody">
       <div class="field"><label>Tipo</label>
-        <select id="ev-type">
+        <select id="ev-type" onchange="toggleEvResultado()">
           <option value="cap">Capacitación</option>
           <option value="insp">Inspección HyS</option>
           <option value="etapa">Etapa constructiva HyS</option>
@@ -433,17 +433,56 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
   </div>
 </div>
 
+
+<!-- INSPECCIÓN HyS MODAL -->
+<div class="modal-bg" id="insp-modal">
+  <div class="modal" style="width:700px;max-height:92vh">
+    <div class="mhd">
+      <div>
+        <h3>Inspección de Higiene y Seguridad</h3>
+        <div class="mhd-sub" id="insp-fecha-sub">Fecha de inspección</div>
+      </div>
+      <button class="mx" onclick="closeInspModal()">✕</button>
+    </div>
+    <div class="mbody">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div class="field">
+          <label>Fecha de inspección (inicio)</label>
+          <input type="date" id="insp-inicio" readonly style="background:#f0f2f6;cursor:not-allowed">
+        </div>
+        <div class="field">
+          <label>Próxima inspección (vencimiento)</label>
+          <input type="date" id="insp-fin">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>Inspector / Técnico HyS</label>
+        <input type="text" id="insp-inspector" placeholder="Nombre del inspector">
+      </div>
+      <div id="insp-cats"></div>
+      <div class="field" style="margin-top:10px">
+        <label>Observaciones generales</label>
+        <textarea id="insp-obs" style="min-height:50px;width:100%;border:1px solid #d0d4db;border-radius:7px;padding:8px;font-size:12px;resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn-cancel" style="background:#fde8e8;color:#c0392b;display:none" id="insp-del-btn" onclick="eliminarInsp()">🗑 Eliminar</button>
+      <button class="btn-cancel" onclick="closeInspModal()">Cancelar</button>
+      <button class="btn-save" onclick="guardarInsp()">Guardar inspección</button>
+    </div>
+  </div>
+</div>
 <script>
-// ── OBRA ID — cambiar por cada obra al desplegar ──
+// -- OBRA ID  -  cambiar por cada obra al desplegar --
 const OBRA_ID='obra_terral_mar'; // Terral al Mar
 
-// ── SUPABASE ──
+// -- SUPABASE --
 const SB_URL='https://aqbctspklwtbrjcwgdsl.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxYmN0c3BrbHd0YnJqY3dnZHNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTMzMDksImV4cCI6MjA5ODA2OTMwOX0.EJYaNnj-48vfDsja4n3qTojhByPONDUpMt97pZwtzZw';
 const LS_KEY='hs_'+OBRA_ID;
 let _saveTimer=null;
 
-// ── STATE ──
+// -- STATE --
 let obra={
   id:OBRA_ID,
   nombre:'',dir:'',inicio:'',fin:'',
@@ -452,7 +491,7 @@ let obra={
 };
 let activeWK=null,chkTarget=null,chkTemp=null,evIdx=null,evType='etapa',editingEv=false;
 
-// ── SUPABASE SAVE/LOAD ──
+// -- SUPABASE SAVE/LOAD --
 function _saveData(){
   try{localStorage.setItem(LS_KEY,JSON.stringify(obra));}catch(e){}
   if(_saveTimer)clearTimeout(_saveTimer);
@@ -474,8 +513,8 @@ async function _saveSB(){
         body:JSON.stringify({id:OBRA_ID,data:obra,updated_at:new Date().toISOString()})
       });
     }
-    showSaveOK('☁ Guardado en la nube');
-  }catch(e){showSaveOK('✓ Guardado local');}
+    showSaveOK('* Guardado en la nube');
+  }catch(e){showSaveOK('OK Guardado local');}
 }
 async function _loadSB(){
   try{
@@ -495,11 +534,11 @@ function loadLocal(){
 function showSaveOK(msg){
   const el=document.getElementById('save-indicator');
   if(!el)return;
-  el.textContent=msg||'✓ Guardado';el.style.opacity='1';
+  el.textContent=msg||'OK Guardado';el.style.opacity='1';
   setTimeout(()=>el.style.opacity='0',2500);
 }
 
-// ── HELPERS ──
+// -- HELPERS --
 function toD(s){return s?new Date(s+'T00:00:00'):null}
 function fmtD(s){if(!s)return'';const[y,m,d]=s.split('-');return d+'/'+m+'/'+y;}
 function wkKey(d){const dt=d?new Date(d+'T00:00:00'):new Date();const t=new Date(dt);t.setHours(0,0,0,0);t.setDate(t.getDate()-((t.getDay()+6)%7));const y=t.getFullYear();const wn=Math.ceil(((t-new Date(y,0,1))/86400000+1)/7);return y+'-W'+String(wn).padStart(2,'0');}
@@ -511,7 +550,7 @@ function wkRange(wk){
   d.setDate(jan4.getDate()-((jan4.getDay()+6)%7)+(w-1)*7);
   const e=new Date(d);e.setDate(d.getDate()+6);
   const mn=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  return d.getDate()+' '+mn[d.getMonth()]+' — '+e.getDate()+' '+mn[e.getMonth()]+' '+e.getFullYear();
+  return d.getDate()+' '+mn[d.getMonth()]+'  -  '+e.getDate()+' '+mn[e.getMonth()]+' '+e.getFullYear();
 }function evInWk(ev,wk){
   const s=toD(ev.inicio),e=toD(ev.fin||ev.inicio);if(!s)return false;
   const[y,w]=wk.split('-W').map(Number);
@@ -523,20 +562,29 @@ function wkRange(wk){
 function pct(ds){if(!obra.inicio||!obra.fin||!ds)return 0;const t=toD(obra.inicio),e=toD(obra.fin),d=toD(ds);const total=e-t;if(total<=0)return 0;return Math.max(0,Math.min(100,(d-t)/total*100));}
 function wPct(s,e){if(!obra.inicio||!obra.fin||!s||!e)return 0;const t=toD(obra.inicio),ed=toD(obra.fin),sd=toD(s),en=toD(e);const total=ed-t;if(total<=0)return 0;return Math.max(0,Math.min(100,(en-sd)/total*100));}
 function chip(arr,type){
-  if(!arr||!arr.length)return'<span class="ev-chip none">—</span>';
-  return arr.map(e=>'<span class="ev-chip '+type+'" title="'+e.desc+'">'+e.desc+'</span>').join('');
+  if(!arr||!arr.length)return'<span class="ev-chip none">-</span>';
+  return arr.map(function(e){
+    var cls=type;
+    if(type==='insp'&&e.resultado){
+      if(e.resultado==='Aprobada')cls='insp-ok';
+      else if(e.resultado==='Aprobada con observaciones')cls='insp-obs';
+      else if(e.resultado==='Desaprobada')cls='insp-fail';
+    }
+    var resTag=e.resultado?'<span style="font-size:8px;opacity:.85"> ('+e.resultado+')</span>':'';
+    return '<span class="ev-chip '+cls+'" title="'+e.desc+(e.resultado?' - '+e.resultado:'')+'">'+ e.desc+resTag+'</span>';
+  }).join('');
 }
 
-// ── RENDER SIDEBAR ──
+// -- RENDER SIDEBAR --
 function renderSB(){
   document.getElementById('sb-nombre').textContent=obra.nombre||'Sin nombre';
   document.getElementById('sb-dir').textContent=obra.dir||'Sin dirección';
-  document.getElementById('sb-do').textContent=obra.do||'—';
-  document.getElementById('sb-ao').textContent=obra.ao||'—';
-  document.getElementById('sb-tecnico').textContent=obra.tecnico||'—';
-  document.getElementById('sb-art').textContent=obra.art||'—';
+  document.getElementById('sb-do').textContent=obra.do||' - ';
+  document.getElementById('sb-ao').textContent=obra.ao||' - ';
+  document.getElementById('sb-tecnico').textContent=obra.tecnico||' - ';
+  document.getElementById('sb-art').textContent=obra.art||' - ';
   document.getElementById('tb-nombre').textContent=obra.nombre||'Obra';
-  const dates=obra.inicio&&obra.fin?fmtD(obra.inicio)+' — '+fmtD(obra.fin):'';
+  const dates=obra.inicio&&obra.fin?fmtD(obra.inicio)+'  -  '+fmtD(obra.fin):'';
   document.getElementById('tb-dates').textContent=dates;
   renderSrvSB();
 }
@@ -545,8 +593,8 @@ function renderSrvSB(){
   const wk=wkKey();
   const wks=Object.keys(obra.servicios||{}).sort().filter(k=>k<=wk);
   const srv=wks.length?(obra.servicios[wks[wks.length-1]]||{}):{};
-  const banio=srv.banio_u?srv.banio_u+' ud · '+(srv.banio_l||0)+' limp/sem':'No configurado';
-  const agua=(srv.agua_d||srv.agua_b)?'Disp: '+(srv.agua_d||0)+' · Bid: '+(srv.agua_b||0)+'/sem':'No configurado';
+  const banio=srv.banio_u?srv.banio_u+' ud  .  '+(srv.banio_l||0)+' limp/sem':'No configurado';
+  const agua=(srv.agua_d||srv.agua_b)?'Disp: '+(srv.agua_d||0)+'  .  Bid: '+(srv.agua_b||0)+'/sem':'No configurado';
   const alarma=srv.alarma_e||'No configurada';
   document.getElementById('sb-banio').textContent=banio;
   document.getElementById('sb-agua').textContent=agua;
@@ -574,9 +622,9 @@ function renderSrvSB(){
           if(e.venc){
             const v=new Date(e.venc+'T00:00:00');
             const dias=Math.round((v-hoy)/86400000);
-            if(dias<0){vencTxt='⚠ Vencido '+fmtD(e.venc);color='#c0392b';}
-            else if(dias<=7){vencTxt='⚠ Vence en '+dias+'d ('+fmtD(e.venc)+')';color='#c0392b';}
-            else if(dias<=30){vencTxt='⚡ Vence '+fmtD(e.venc);color='#e67e22';}
+            if(dias<0){vencTxt='! Vencido '+fmtD(e.venc);color='#c0392b';}
+            else if(dias<=7){vencTxt='! Vence en '+dias+'d ('+fmtD(e.venc)+')';color='#c0392b';}
+            else if(dias<=30){vencTxt='! Vence '+fmtD(e.venc);color='#e67e22';}
             else{vencTxt='Vence: '+fmtD(e.venc);color='#4a7a50';}
           }else{vencTxt='Sin vencimiento';color='#6a8aaa';}
           const motivo=e.motivo==='recarga'?'Recarga':'Compra';
@@ -595,8 +643,8 @@ function barRow(label,color,evArr,type){
     const l=pct(ev.inicio),w=(ev.inicio===ev.fin||type==='cap'||type==='insp')?null:wPct(ev.inicio,ev.fin);
     const isPt=(ev.inicio===ev.fin)||type==='cap'||type==='insp';
     const style=isPt?`left:${l}%`:`left:${l}%;width:${w}%`;
-    const lbl=(!isPt&&w>8)?ev.desc.slice(0,22)+(ev.desc.length>22?'…':''):(type==='insp'?'':'');
-    return`<div class="gbar ${type}" style="${style}" title="${ev.desc}${ev.obs?' — '+ev.obs:''}" onclick="clickBar(${i},'${type}')">${lbl}</div>`;
+    const lbl=(!isPt&&w>8)?ev.desc.slice(0,22)+(ev.desc.length>22?'...':''):(type==='insp'?'':'');
+    return`<div class="gbar ${type}" style="${style}" title="${ev.desc}${ev.obs?'  -  '+ev.obs:''}" onclick="clickBar(${i},'${type}')">${lbl}</div>`;
   }).join('');
   return`<div class="gantt-row">
     <div class="grl"><div class="grl-dot" style="background:${color}"></div><div class="grl-txt">${label}</div></div>
@@ -608,7 +656,7 @@ function buildSrvEvs(){
   if(!obra.inicio||!obra.fin)return[];
   const wk=wkKey();const srv=obra.servicios[wk]||{};
   const parts=[];
-  if(srv.banio_u)parts.push('🚽×'+srv.banio_u);
+  if(srv.banio_u)parts.push('🚽x'+srv.banio_u);
   if(srv.agua_b)parts.push('💧'+srv.agua_b+'bid');
   if(srv.alarma_e&&srv.alarma_e!=='No instalada')parts.push('🚨');
   return[{type:'servicios',desc:parts.length?parts.join(' '):'Servicios',inicio:obra.inicio,fin:obra.fin,obs:''}];
@@ -635,7 +683,7 @@ function renderTL(){
   document.getElementById('tl-wrap').innerHTML=`
   <div class="tl-wrap">
     <div class="tl-head">
-      <span class="tl-title">Línea de tiempo — ${obra.nombre||''}</span>
+      <span class="tl-title">Línea de tiempo  -  ${obra.nombre||''}</span>
       <div class="leg"><div class="leg-pill" style="background:#c0392b"></div>Plan Arq.</div>
 
       <div class="leg"><div class="leg-pill" style="background:#1a4fa0"></div>Etapas HyS</div>
@@ -678,10 +726,10 @@ function setTodayLine(){
 
 function clickBar(idx,type){
   const evs=(obra.eventos||[]).filter(e=>e.type===type);
-  if(evs[idx])alert(evs[idx].desc+(evs[idx].obs?'\n'+evs[idx].obs:'')+'\n'+fmtD(evs[idx].inicio)+' → '+fmtD(evs[idx].fin));
+  if(evs[idx])alert(evs[idx].desc+(evs[idx].obs?'\n'+evs[idx].obs:'')+'\n'+fmtD(evs[idx].inicio)+' -> '+fmtD(evs[idx].fin));
 }
 
-// ── RENDER WEEK TABLE ──
+// -- RENDER WEEK TABLE --
 function renderWT(){
   if(!obra.inicio||!obra.fin){
     document.getElementById('wt-wrap').innerHTML='<div style="padding:20px;color:#aaa;font-size:12px">Cargá las fechas de inicio y fin de la obra para ver el calendario semanal.</div>';
@@ -705,12 +753,12 @@ function renderWT(){
     const caW=evWk.filter(e=>e.type==='cap');
     const inW=evWk.filter(e=>e.type==='insp');
     const srv=(obra.servicios||{})[wkKey(wk)]||{};
-    const srvChip=srv.banio_u?`<span class="ev-chip servicios">🚽${srv.banio_u}ud</span>`:'<span class="ev-chip none">—</span>';
+    const srvChip=srv.banio_u?`<span class="ev-chip servicios">🚽${srv.banio_u}ud</span>`:'<span class="ev-chip none"> - </span>';
     const rel=(obra.relevamientos||{})[wkKey(wk)];
     const st=rel?(rel._noRelev?'#7c3fa0':catColor(rel)):'';
     const btnStyle=st?`background:${st}`:'background:#1a4fa0';
     return`<div class="wt-row${isToday?' semana-actual':''}" ${isToday?'id="semana-actual-row"':''}>
-      <div class="wtc"><div class="wt-wk">${label}${isToday?' ◀':''}</div><div class="wt-wk-sub">Sem ${wn}</div></div>
+      <div class="wtc"><div class="wt-wk">${label}${isToday?' <':''}</div><div class="wt-wk-sub">Sem ${wn}</div></div>
       <div class="wtc">${chip(plW,'plan')}</div>
       <div class="wtc" style="background:rgba(230,126,34,.03);padding:5px 6px">
         ${buildSrvInline(wkKey(wk))}
@@ -758,7 +806,7 @@ function catColor(rel){
   return'#1a4fa0';
 }
 
-// ── INFO MODAL ──
+// -- INFO MODAL --
 function openInfoModal(){
   document.getElementById('inf-nombre').value=obra.nombre||'';
   document.getElementById('inf-dir').value=obra.dir||'';
@@ -784,7 +832,7 @@ function guardarInfo(){
 }
 document.getElementById('info-modal').addEventListener('click',function(e){if(e.target===this)closeInfoModal();});
 
-// ── SERVICIOS SEMANA ──
+// -- SERVICIOS SEMANA --
 function openSrvSemana(wk){
   if(!wk)wk=wkKey();
   const srv=(obra.servicios||{})[wk]||{};
@@ -827,7 +875,7 @@ function guardarSrv(){
 }
 document.getElementById('srv-modal').addEventListener('click',function(e){if(e.target===this)closeSrvModal();});
 
-// ── EV MODAL ──
+// -- EV MODAL --
 function openEvModal(idx){
   editingEv=idx!==null;evIdx=idx;
   const ev=idx!==null?(obra.eventos||[])[idx]:null;
@@ -844,14 +892,14 @@ function openEvModal(idx){
 function closeEvModal(){document.getElementById('ev-modal').classList.remove('open');}
 function guardarEv(){
   if(!obra.eventos)obra.eventos=[];
-  const ev={type:document.getElementById('ev-type').value,desc:document.getElementById('ev-desc').value,inicio:document.getElementById('ev-inicio').value,fin:document.getElementById('ev-fin').value||document.getElementById('ev-inicio').value,obs:document.getElementById('ev-obs').value};
+  const ev={type:document.getElementById('ev-type').value,desc:document.getElementById('ev-desc').value,inicio:document.getElementById('ev-inicio').value,fin:document.getElementById('ev-fin').value||document.getElementById('ev-inicio').value,obs:document.getElementById('ev-obs').value,resultado:(document.getElementById('ev-resultado')?document.getElementById('ev-resultado').value:'')};
   if(editingEv&&evIdx!==null)obra.eventos[evIdx]=ev;else obra.eventos.push(ev);
   closeEvModal();renderTL();_saveData();showSaveOK();
 }
 function elimEv(){if(evIdx!==null)obra.eventos.splice(evIdx,1);closeEvModal();renderTL();_saveData();showSaveOK();}
 document.getElementById('ev-modal').addEventListener('click',function(e){if(e.target===this)closeEvModal();});
 
-// ── CHECKLIST ──
+// -- CHECKLIST --
 const CATS=[
   {key:'docs_hys',label:'Documentación HyS',items:['Programa de Seguridad','Documentación Higiene y Seguridad','Capacitaciones','Planilla 299/11','Rol de emergencia para accidentes','Cartelería HyS']},
   {key:'docs_lab',label:'Documentación Laboral',items:['Seguro de Responsabilidad Civil','Seguro de Accidentes Personales','Documentación de subcontratos','Certificado de ART','Alta temprana de trabajadores','Constancia de inscripción AFIP']},
@@ -924,7 +972,7 @@ function guardarChk(){
 }
 document.getElementById('chk-modal').addEventListener('click',function(e){if(e.target===this)closeChk();});
 
-// ── FILE STORAGE ──
+// -- FILE STORAGE --
 function handlePDF(input){
   const file=input.files[0];if(!file)return;input.value='';
   if(!obra.archivos)obra.archivos=[];
@@ -932,7 +980,7 @@ function handlePDF(input){
   const r=new FileReader();
   r.onload=e=>{obra.archivos.push({name:file.name,size:file.size,fecha:new Date().toLocaleDateString('es-AR'),tipo:'ps'});_saveData();showSaveOK('📄 Prog. de Seguridad guardado');};
   r.readAsDataURL(file);
-  document.getElementById('ai-s').innerHTML='<div class="ai-bar done">✓ '+file.name+' guardado. Subilo en el chat de Claude para analizarlo.</div>';
+  document.getElementById('ai-s').innerHTML='<div class="ai-bar done">OK '+file.name+' guardado. Subilo en el chat de Claude para analizarlo.</div>';
   setTimeout(()=>{try{document.getElementById('ai-s').innerHTML='';}catch(e){}},5000);
 }
 
@@ -943,11 +991,11 @@ function handlePlanPDF(input){
   const r=new FileReader();
   r.onload=e=>{obra.archivos.push({name:file.name,size:file.size,fecha:new Date().toLocaleDateString('es-AR'),tipo:'plan'});_saveData();showSaveOK('📐 Plan de trabajo guardado');};
   r.readAsDataURL(file);
-  document.getElementById('ai-s').innerHTML='<div class="ai-bar done">✓ '+file.name+' guardado. Subilo en el chat de Claude para analizarlo.</div>';
+  document.getElementById('ai-s').innerHTML='<div class="ai-bar done">OK '+file.name+' guardado. Subilo en el chat de Claude para analizarlo.</div>';
   setTimeout(()=>{try{document.getElementById('ai-s').innerHTML='';}catch(e){}},5000);
 }
 
-// ── EXPORT / IMPORT ──
+// -- EXPORT / IMPORT --
 function exportData(){
   const blob=new Blob([JSON.stringify(obra,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
@@ -961,13 +1009,13 @@ function importData(input){
     try{
       const d=JSON.parse(e.target.result);
       obra=Object.assign(obra,d);
-      _saveData();renderSB();renderTL();showSaveOK('✓ Datos importados');
+      _saveData();renderSB();renderTL();showSaveOK('OK Datos importados');
     }catch(err){alert('Error al importar: '+err.message);}
   };
   r.readAsText(file);input.value='';
 }
 
-// ── IMPORT JSON FROM CLAUDE ──
+// -- IMPORT JSON FROM CLAUDE --
 function openImportJSON(){
   document.getElementById('import-json-text').value='';
   document.getElementById('import-json-error').style.display='none';
@@ -1003,14 +1051,14 @@ function procesarImportJSON(){
       });
     }
     closeImportJSON();_saveData();showSaveOK();renderSB();renderTL();
-    document.getElementById('ai-s').innerHTML='<div class="ai-bar done">✓ '+added+' eventos importados.</div>';
+    document.getElementById('ai-s').innerHTML='<div class="ai-bar done">OK '+added+' eventos importados.</div>';
     setTimeout(()=>{try{document.getElementById('ai-s').innerHTML='';}catch(e){}},4000);
   }catch(err){errEl.textContent='JSON inválido: '+err.message;errEl.style.display='block';}
 }
 document.getElementById('import-json-modal').addEventListener('click',function(e){if(e.target===this)closeImportJSON();});
 
 
-// ── PERSONAL ──
+// -- PERSONAL --
 let editingOpIdx = null;
 let eppRows = [];
 let ropaRows = [];
@@ -1073,9 +1121,9 @@ function renderPersonalList(){
       <div style="width:32px;height:32px;border-radius:50%;background:#1a4fa0;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${(op.nombre||'?').charAt(0).toUpperCase()}</div>
       <div style="flex:1">
         <div style="font-size:12px;font-weight:700;color:#1a2332">${op.nombre||'Sin nombre'}</div>
-        <div style="font-size:10px;color:#888;margin-top:2px">👕 ${ropaCount} prendas acumuladas · 🦺 ${eppCount} ítems EPP acumulados</div>
+        <div style="font-size:10px;color:#888;margin-top:2px">👕 ${ropaCount} prendas acumuladas  .  🦺 ${eppCount} ítems EPP acumulados</div>
       </div>
-      <div style="font-size:11px;color:#1a4fa0">✎ Editar</div>
+      <div style="font-size:11px;color:#1a4fa0">Editar Editar</div>
     </div>`;
   }).join('');
 }
@@ -1104,7 +1152,7 @@ function renderAcumSummary(rows, elId){
   const keys=Object.keys(ac);
   const el=document.getElementById(elId);
   if(!keys.length){el.textContent='';return;}
-  el.textContent=keys.map(k=>k+': '+ac[k].total).join(' · ');
+  el.textContent=keys.map(k=>k+': '+ac[k].total).join('  .  ');
 }
 
 function renderRopaRows(){
@@ -1123,7 +1171,7 @@ function renderRopaRows(){
       <select onchange="updateRopaRow(${i},'item',this.value)" style="border:1px solid #d0d4db;border-radius:6px;padding:6px 8px;font-size:11px"><option value="">Seleccionar prenda...</option>${opts}</select>
       <input type="number" min="0" placeholder="Cant." value="${row.cant||0}" onchange="updateRopaRow(${i},'cant',this.value)" style="border:1px solid #d0d4db;border-radius:6px;padding:6px 8px;font-size:11px">
       <input type="date" value="${row.fecha||''}" onchange="updateRopaRow(${i},'fecha',this.value)" style="border:1px solid #d0d4db;border-radius:6px;padding:6px 8px;font-size:11px">
-      <button onclick="removeRopaRow(${i})" style="background:#fde8e8;color:#c0392b;border:none;border-radius:6px;height:30px;cursor:pointer;font-size:13px">✕</button>
+      <button onclick="removeRopaRow(${i})" style="background:#fde8e8;color:#c0392b;border:none;border-radius:6px;height:30px;cursor:pointer;font-size:13px">x</button>
     </div>`;
   }).join('');
 }
@@ -1145,7 +1193,7 @@ function renderEppRows(){
       <select onchange="updateEppRow(${i},'item',this.value)" style="border:1px solid #d0d4db;border-radius:6px;padding:6px 8px;font-size:11px"><option value="">Seleccionar EPP...</option>${EPP_OPTS.map(o=>`<option value="${o}" ${row.item===o?'selected':''}>${o}</option>`).join('')}</select>
       <input type="number" min="0" placeholder="Cant." value="${row.cant||0}" onchange="updateEppRow(${i},'cant',this.value)" style="border:1px solid #d0d4db;border-radius:6px;padding:6px 8px;font-size:11px">
       <input type="date" value="${row.fecha||''}" onchange="updateEppRow(${i},'fecha',this.value)" style="border:1px solid #d0d4db;border-radius:6px;padding:6px 8px;font-size:11px">
-      <button onclick="removeEppRow(${i})" style="background:#fde8e8;color:#c0392b;border:none;border-radius:6px;height:30px;cursor:pointer;font-size:13px">✕</button>
+      <button onclick="removeEppRow(${i})" style="background:#fde8e8;color:#c0392b;border:none;border-radius:6px;height:30px;cursor:pointer;font-size:13px">x</button>
     </div>`;
   }).join('');
 }
@@ -1176,7 +1224,7 @@ document.getElementById('personal-modal').addEventListener('click',function(e){i
 document.getElementById('operario-modal').addEventListener('click',function(e){if(e.target===this)closeOperarioForm();});
 
 
-// ── EXTINTORES ──
+// -- EXTINTORES --
 let extRows = [];
 
 function renderExtList(){
@@ -1208,7 +1256,7 @@ function renderExtList(){
           <div style="font-size:9px;color:#888;margin-bottom:2px">Proveedor</div>
           <input type="text" value="${e.prov||''}" placeholder="Proveedor" onchange="extRows[${i}].prov=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px">
         </div>
-        <button onclick="extRows.splice(${i},1);renderExtList()" style="background:#fde8e8;color:#c0392b;border:none;border-radius:5px;height:30px;cursor:pointer">✕</button>
+        <button onclick="extRows.splice(${i},1);renderExtList()" style="background:#fde8e8;color:#c0392b;border:none;border-radius:5px;height:30px;cursor:pointer">x</button>
       </div>
     </div>`).join('');
 }
@@ -1219,7 +1267,7 @@ function addExtintor(){
 }
 
 
-// ── SERVICIOS INLINE EN TABLA ──
+// -- SERVICIOS INLINE EN TABLA --
 function buildSrvInline(wk){
   const srv=(obra.servicios||{})[wk]||{};
   const id=wk.replace(/[^a-z0-9]/gi,'_');
@@ -1268,7 +1316,7 @@ function buildSrvInline(wk){
         ${['Activo','Sin servicio','No instalado'].map(v=>`<option value="${v}" ${(srv.internet_e||'No instalado')===v?'selected':''}>${v}</option>`).join('')}
       </select>
     </div>
-    <div style="font-size:8px;color:#4a7a50;margin-top:3px;display:none" id="srv-saved-${id}">✓ guardado</div>
+    <div style="font-size:8px;color:#4a7a50;margin-top:3px;display:none" id="srv-saved-${id}">OK guardado</div>
   </div>`;
 }
 
@@ -1290,7 +1338,7 @@ function saveSrvField(wk, field, val){
 }
 
 
-// ── MODAL EXTINTORES STANDALONE ──
+// -- MODAL EXTINTORES STANDALONE --
 let extModalRows = [];
 
 function openExtModal(){
@@ -1333,7 +1381,7 @@ function renderExtListModal(){
       +'<input type="date" value="'+(e.venc||'')+'" onchange="extModalRows['+i+'].venc=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px"></div>'
       +'<div><div style="font-size:9px;color:#888;margin-bottom:2px">Proveedor</div>'
       +'<input type="text" value="'+(e.prov||'')+'" placeholder="Proveedor" onchange="extModalRows['+i+'].prov=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px"></div>'
-      +'<button onclick="extModalRows.splice('+i+',1);renderExtListModal()" style="background:#fde8e8;color:#c0392b;border:none;border-radius:5px;height:30px;cursor:pointer;margin-top:14px">✕</button>'
+      +'<button onclick="extModalRows.splice('+i+',1);renderExtListModal()" style="background:#fde8e8;color:#c0392b;border:none;border-radius:5px;height:30px;cursor:pointer;margin-top:14px">x</button>'
       +'</div></div>';
   }).join('');
 }
@@ -1363,11 +1411,149 @@ function guardarExtModal(){
 }
 document.getElementById('ext-modal').addEventListener('click',function(e){if(e.target===this)closeExtModal();});
 
-// ── INIT ──
+function toggleEvResultado(){
+  const t=document.getElementById('ev-type').value;
+  const wrap=document.getElementById('ev-resultado-wrap');
+  if(wrap)wrap.style.display=t==='insp'?'':'none';
+}
+// -- INSPECCIÓN HyS MODAL --
+const INSP_CATS = [
+  'Documentación HyS',
+  'Documentación Laboral',
+  'Maquinaria y Equipos',
+  'Instalación Eléctrica',
+  'EPP y Vestimenta',
+  'Trabajos en Altura',
+  'Orden y Limpieza',
+  'Servicios',
+  'Seguridad Perimetral',
+];
+
+let inspIdx = null;
+let inspCatItems = {};
+
+function openInspModal(idx){
+  inspIdx = idx;
+  const insp = idx !== null ? (obra.inspecciones||[])[idx] : null;
+  const hoy = new Date().toISOString().slice(0,10);
+  document.getElementById('insp-inicio').value = insp ? insp.inicio : hoy;
+  document.getElementById('insp-fin').value = insp ? insp.fin||'' : '';
+  document.getElementById('insp-inspector').value = insp ? insp.inspector||'' : (obra.tecnico||'');
+  document.getElementById('insp-obs').value = insp ? insp.obs||'' : '';
+  document.getElementById('insp-fecha-sub').textContent = insp
+    ? 'Inspección del ' + fmtD(insp.inicio)
+    : 'Nueva inspección - ' + fmtD(hoy);
+  document.getElementById('insp-del-btn').style.display = insp ? '' : 'none';
+  inspCatItems = {};
+  INSP_CATS.forEach(function(cat){
+    var saved = insp && insp.cats && insp.cats[cat] ? insp.cats[cat] : [];
+    inspCatItems[cat] = saved.length ? JSON.parse(JSON.stringify(saved)) : [{desc:'',estado:''}];
+  });
+  renderInspCats();
+  document.getElementById('insp-modal').classList.add('open');
+}
+
+function closeInspModal(){
+  document.getElementById('insp-modal').classList.remove('open');
+}
+
+function renderInspCats(){
+  var wrap = document.getElementById('insp-cats');
+  var html = '';
+  INSP_CATS.forEach(function(cat){
+    var items = inspCatItems[cat]||[];
+    html += '<div style="margin-bottom:14px;border:1px solid #e8eaf0;border-radius:8px;overflow:hidden">';
+    html += '<div style="background:#1a2332;color:#fff;font-size:11px;font-weight:700;padding:7px 12px">' + cat + '</div>';
+    html += '<div style="padding:10px 12px">';
+    items.forEach(function(it, i){
+      html += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px" data-cat="' + cat + '" data-i="' + i + '">';
+      html += '<input type="text" class="insp-item-desc" data-cat="' + cat + '" data-i="' + i + '" value="' + (it.desc||'').replace(/"/g,'&quot;') + '" placeholder="Describir ítem..." style="flex:1;border:1px solid #d0d4db;border-radius:5px;padding:5px 8px;font-size:11px">';
+      html += '<div style="display:flex;gap:3px">';
+      ['Falta','Pedido','Con Restricción'].forEach(function(est){
+        var active = it.estado === est;
+        html += '<button type="button" class="insp-est-btn" data-cat="' + cat + '" data-i="' + i + '" data-est="' + est + '" style="font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;border:1px solid ' + (active?'#1a4fa0':'#d0d4db') + ';background:' + (active?'#1a4fa0':'#fff') + ';color:' + (active?'#fff':'#555') + '">' + est + '</button>';
+      });
+      html += '</div>';
+      html += '<button type="button" class="insp-remove-btn" data-cat="' + cat + '" data-i="' + i + '" style="background:#fde8e8;color:#c0392b;border:none;border-radius:4px;width:22px;height:22px;cursor:pointer;font-size:13px;line-height:1">x</button>';
+      html += '</div>';
+    });
+    html += '<button type="button" class="insp-add-btn" data-cat="' + cat + '" style="font-size:10px;color:#1a4fa0;background:none;border:1px dashed #1a4fa0;border-radius:5px;padding:3px 10px;cursor:pointer;margin-top:2px">+ Agregar ítem</button>';
+    html += '</div></div>';
+  });
+  wrap.innerHTML = html;
+
+  // Bind events via delegation
+  wrap.querySelectorAll('.insp-item-desc').forEach(function(el){
+    el.addEventListener('change', function(){
+      inspCatItems[this.dataset.cat][this.dataset.i].desc = this.value;
+    });
+  });
+  wrap.querySelectorAll('.insp-est-btn').forEach(function(el){
+    el.addEventListener('click', function(){
+      var cat = this.dataset.cat, i = parseInt(this.dataset.i), est = this.dataset.est;
+      inspCatItems[cat][i].estado = inspCatItems[cat][i].estado === est ? '' : est;
+      renderInspCats();
+    });
+  });
+  wrap.querySelectorAll('.insp-remove-btn').forEach(function(el){
+    el.addEventListener('click', function(){
+      var cat = this.dataset.cat, i = parseInt(this.dataset.i);
+      inspCatItems[cat].splice(i,1);
+      if(!inspCatItems[cat].length) inspCatItems[cat] = [{desc:'',estado:''}];
+      renderInspCats();
+    });
+  });
+  wrap.querySelectorAll('.insp-add-btn').forEach(function(el){
+    el.addEventListener('click', function(){
+      inspCatItems[this.dataset.cat].push({desc:'',estado:''});
+      renderInspCats();
+    });
+  });
+}
+
+function guardarInsp(){
+  var inicio = document.getElementById('insp-inicio').value;
+  var fin = document.getElementById('insp-fin').value;
+  var inspector = document.getElementById('insp-inspector').value;
+  var obs = document.getElementById('insp-obs').value;
+  if(!inicio){alert('Completá la fecha de inspección.');return;}
+  var insp = {
+    type:'insp',
+    desc:'Inspección HyS' + (inspector?' - '+inspector:''),
+    inicio:inicio, fin:fin||inicio, inspector:inspector, obs:obs, cats:{},
+  };
+  INSP_CATS.forEach(function(cat){
+    var items = (inspCatItems[cat]||[]).filter(function(it){return it.desc||it.estado;});
+    if(items.length) insp.cats[cat] = items;
+  });
+  if(!obra.inspecciones) obra.inspecciones=[];
+  if(inspIdx!==null) obra.inspecciones[inspIdx]=insp; else obra.inspecciones.push(insp);
+  if(!obra.eventos) obra.eventos=[];
+  var ei = obra.eventos.findIndex(function(e){return e.type==='insp'&&e.inicio===inicio;});
+  var evData = {type:'insp',desc:insp.desc,inicio:inicio,fin:insp.fin,obs:obs,inspector:inspector,cats:insp.cats};
+  if(ei>=0) obra.eventos[ei]=evData; else obra.eventos.push(evData);
+  closeInspModal();
+  _saveData();showSaveOK();renderTL();
+}
+
+function eliminarInsp(){
+  if(inspIdx===null||!confirm('¿Eliminar esta inspección?'))return;
+  var insp = obra.inspecciones[inspIdx];
+  obra.inspecciones.splice(inspIdx,1);
+  if(insp&&obra.eventos){
+    var ei = obra.eventos.findIndex(function(e){return e.type==='insp'&&e.inicio===insp.inicio;});
+    if(ei>=0) obra.eventos.splice(ei,1);
+  }
+  closeInspModal();_saveData();showSaveOK();renderTL();
+}
+
+document.getElementById('insp-modal').addEventListener('click',function(e){if(e.target===this)closeInspModal();});
+
+// -- INIT --
 (async()=>{
   loadLocal();
   const ind=document.getElementById('save-indicator');
-  ind.textContent='☁ Cargando...';ind.style.opacity='1';
+  ind.textContent='* Cargando...';ind.style.opacity='1';
   await _loadSB();
   ind.style.opacity='0';
   renderSB();
