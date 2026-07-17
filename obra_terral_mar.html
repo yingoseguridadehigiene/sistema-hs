@@ -1545,13 +1545,16 @@ function guardarInsp(){
 }
 
 function eliminarInsp(){
-  if(inspIdx===null||!confirm('¿Eliminar esta inspección?'))return;
-  var insp = obra.inspecciones[inspIdx];
-  obra.inspecciones.splice(inspIdx,1);
-  if(insp&&obra.eventos){
-    var ei = obra.eventos.findIndex(function(e){return e.type==='insp'&&e.inicio===insp.inicio;});
-    if(ei>=0) obra.eventos.splice(ei,1);
-  }
+  if(!confirm('¿Eliminar esta inspección?'))return;
+  var inicio = document.getElementById('insp-inicio').value;
+  // Remove from obra.inspecciones if exists
+  if(!obra.inspecciones) obra.inspecciones=[];
+  var ii = obra.inspecciones.findIndex(function(ins){return ins.inicio===inicio;});
+  if(ii>=0) obra.inspecciones.splice(ii,1);
+  // Remove from obra.eventos
+  if(!obra.eventos) obra.eventos=[];
+  var ei = obra.eventos.findIndex(function(e){return e.type==='insp'&&e.inicio===inicio;});
+  if(ei>=0) obra.eventos.splice(ei,1);
   closeInspModal();_saveData();showSaveOK();renderTL();
 }
 
