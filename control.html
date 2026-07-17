@@ -282,11 +282,11 @@ function buildEventosObra(obra, color){
     plan: {icon:'📐', label:'Plan Arq.',     color:'#c0392b'},
   };
   // Show upcoming events in next 30 days + overdue in last 7 days
+  const HYS_TYPES = ['cap','insp','etapa'];
   const evs = (obra.eventos||[]).filter(ev=>{
-    const ini = new Date(ev.inicio+'T00:00:00');
+    if(!HYS_TYPES.includes(ev.type)) return false;
     const fin = new Date(ev.fin+'T00:00:00');
     const diasHastaFin = Math.round((fin-hoy)/86400000);
-    const diasDesdeIni = Math.round((hoy-ini)/86400000);
     return diasHastaFin >= -7 && diasHastaFin <= 30;
   }).sort((a,b)=>a.inicio.localeCompare(b.inicio));
   if(!evs.length) return '';

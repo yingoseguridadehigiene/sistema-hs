@@ -61,8 +61,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 .gantt-today{position:absolute;top:0;bottom:0;width:2px;background:rgba(220,50,50,.5);z-index:2;pointer-events:none}
 
 /* ── WEEK TABLE ── */
-.wt-wrap{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden}
-.wt-head-row{display:grid;grid-template-columns:90px 1fr 1fr 1fr 1fr 1fr 1fr 64px;background:#f7f8fa;border-bottom:2px solid #e0e4ec}
+.wt-wrap{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden}.wt-scroll{overflow-y:auto;max-height:480px}
+.wt-head-row{display:grid;grid-template-columns:90px 1fr 1fr 1fr 1fr 1fr 1fr 64px;background:#f7f8fa;border-bottom:2px solid #e0e4ec;position:sticky;top:0;z-index:10}
 .wth{padding:6px 8px;font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.03em;border-right:1px solid #eee}
 .wt-row{display:grid;grid-template-columns:90px 1fr 1fr 1fr 1fr 1fr 1fr 64px;border-bottom:1px solid #f0f2f6;min-height:44px;align-items:start}
 .wt-row:hover{background:#fafbff}
@@ -312,10 +312,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
     <div class="mbody">
       <div class="field"><label>Tipo</label>
         <select id="ev-type">
-          <option value="etapa">Etapa constructiva HyS</option>
           <option value="cap">Capacitación</option>
           <option value="insp">Inspección HyS</option>
-          <option value="plan">Plan de trabajo (Arq.)</option>
+          <option value="etapa">Etapa constructiva HyS</option>
         </select>
       </div>
       <div class="field"><label>Descripción</label><input type="text" id="ev-desc" placeholder="Descripción del evento"></div>
@@ -658,7 +657,14 @@ function renderTL(){
   // Scroll to current week after render
   setTimeout(()=>{
     const el=document.getElementById('semana-actual-row');
-    if(el){el.scrollIntoView({behavior:'smooth',block:'center'});}
+    if(el){
+      const scroll=el.closest('.wt-scroll');
+      if(scroll){
+        scroll.scrollTop=el.offsetTop-scroll.offsetTop-scroll.clientHeight/2+el.clientHeight/2;
+      } else {
+        el.scrollIntoView({behavior:'smooth',block:'center'});
+      }
+    }
   },300);
 }
 
@@ -732,7 +738,9 @@ function renderWT(){
       <div class="wth hd-insp">🔍 Inspec.</div>
       <div class="wth">Tablero</div>
     </div>
-    ${rows}
+    <div class="wt-scroll">
+      ${rows}
+    </div>
   </div>
   `;
   }catch(err){
