@@ -167,10 +167,30 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
       <div class="sb-srv-prov" id="sb-alarma-prov">—</div>
     </div>
     <div class="sb-srv-item">
+      <div class="sb-srv-name">📷 Cámaras de seguridad</div>
+      <div class="sb-srv-val" id="sb-camaras">—</div>
+      <div class="sb-srv-prov" id="sb-camaras-prov"></div>
+    </div>
+    <div class="sb-srv-item">
+      <div class="sb-srv-name">🌐 Internet</div>
+      <div class="sb-srv-val" id="sb-internet">—</div>
+      <div class="sb-srv-prov" id="sb-internet-prov"></div>
+    </div>
+    <div class="sb-srv-item">
       <div class="sb-srv-name">🧯 Extintores</div>
       <div class="sb-srv-val" id="sb-ext-cant">—</div>
       <div class="sb-srv-prov" id="sb-ext-venc"></div>
     </div>
+    <button class="sb-edit" style="color:#c0392b;border-color:#c0392b;margin-top:5px" onclick="openExtModal()">🧯 Gestionar extintores</button>
+    <div class="sb-srv-item">
+      <div class="sb-srv-name">📷 Cámaras de seguridad</div>
+      <div class="sb-srv-val" id="sb-camaras">—</div>
+    </div>
+    <div class="sb-srv-item">
+      <div class="sb-srv-name">🌐 Internet</div>
+      <div class="sb-srv-val" id="sb-internet">—</div>
+    </div>
+    <button class="sb-edit" style="color:#c0392b;border-color:#c0392b;margin-top:5px" onclick="openExtModal()">🧯 Editar extintores</button>
   </div>
 
   <div class="sb-block">
@@ -252,6 +272,20 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
         </select>
       </div>
       <div class="field"><label>🚨 Alarma — Proveedor</label><input type="text" id="srv-alarma-p" placeholder="Ej: Securitas"></div>
+      <div class="field"><label>📷 Cámaras de seguridad — Estado</label>
+        <select id="srv-camaras-e">
+          <option value="Activas">Activas</option>
+          <option value="Sin activar">Sin activar</option>
+          <option value="No instaladas">No instaladas</option>
+        </select>
+      </div>
+      <div class="field"><label>🌐 Internet — Estado</label>
+        <select id="srv-internet-e">
+          <option value="Activo">Activo</option>
+          <option value="Sin activar">Sin activar</option>
+          <option value="No instalado">No instalado</option>
+        </select>
+      </div>
       <div class="field" style="border-top:1px solid #f0f2f6;padding-top:12px;margin-top:4px">
         <label style="display:flex;justify-content:space-between;align-items:center">
           🧯 Extintores
@@ -378,6 +412,28 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
   </div>
 </div>
 
+
+<!-- EXTINTORES MODAL -->
+<div class="modal-bg" id="ext-modal">
+  <div class="modal" style="width:560px;max-height:90vh">
+    <div class="mhd">
+      <div><h3>🧯 Extintores en obra</h3><div class="mhd-sub">Uno por unidad — con tipo, motivo y vencimiento individual</div></div>
+      <button class="mx" onclick="closeExtModal()">✕</button>
+    </div>
+    <div class="mbody">
+      <div style="background:#fffbe6;border:1px solid #ffe58f;border-radius:7px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#856404">
+        Actualizá estos datos cuando comprés o recargues un extintor. El vencimiento se usa para alertas en el sidebar.
+      </div>
+      <div id="ext-list-modal"></div>
+      <button class="btn-sm btn-green" style="margin-top:8px" onclick="addExtintorModal()">+ Agregar extintor</button>
+    </div>
+    <div class="mfoot">
+      <button class="btn-cancel" onclick="closeExtModal()">Cancelar</button>
+      <button class="btn-save" onclick="guardarExtModal()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── OBRA ID — cambiar por cada obra al desplegar ──
 const OBRA_ID='obra_terral_mar'; // Terral al Mar
@@ -488,8 +544,9 @@ function renderSB(){
 
 function renderSrvSB(){
   const wk=wkKey();
-  const srv=obra.servicios[wk]||{};
-  const banio=srv.banio_u?srv.banio_u+' ud · '+( srv.banio_l||0)+' limp/sem':'No configurado';
+  const wks=Object.keys(obra.servicios||{}).sort().filter(k=>k<=wk);
+  const srv=wks.length?(obra.servicios[wks[wks.length-1]]||{}):{};
+  const banio=srv.banio_u?srv.banio_u+' ud · '+(srv.banio_l||0)+' limp/sem':'No configurado';
   const agua=(srv.agua_d||srv.agua_b)?'Disp: '+(srv.agua_d||0)+' · Bid: '+(srv.agua_b||0)+'/sem':'No configurado';
   const alarma=srv.alarma_e||'No configurada';
   document.getElementById('sb-banio').textContent=banio;
@@ -498,7 +555,10 @@ function renderSrvSB(){
   document.getElementById('sb-banio-prov').textContent=srv.banio_prov?'Prov: '+srv.banio_prov:'Sin proveedor';
   document.getElementById('sb-agua-prov').textContent=srv.agua_prov?'Prov: '+srv.agua_prov:'Sin proveedor';
   document.getElementById('sb-alarma-prov').textContent=srv.alarma_p?'Prov: '+srv.alarma_p:'Sin proveedor';
-  // Extintor
+  const camEl=document.getElementById('sb-camaras');
+  if(camEl)camEl.textContent=srv.camaras_e||'No configurado';
+  const netEl=document.getElementById('sb-internet');
+  if(netEl)netEl.textContent=srv.internet_e||'No configurado';
   const extEl=document.getElementById('sb-ext-cant');
   const extVEl=document.getElementById('sb-ext-venc');
   if(extEl){
@@ -526,13 +586,11 @@ function renderSrvSB(){
       }
     }
   }
-  // Personal count
   const pCount=(obra.personal||[]).length;
   const pEl=document.getElementById('sb-personal-count');
   if(pEl)pEl.textContent=pCount+' operario'+(pCount===1?'':'s')+' cargado'+(pCount===1?'':'s');
 }
 
-// ── RENDER GANTT ──
 function barRow(label,color,evArr,type){
   const bars=evArr.map((ev,i)=>{
     const l=pct(ev.inicio),w=(ev.inicio===ev.fin||type==='cap'||type==='insp')?null:wPct(ev.inicio,ev.fin);
@@ -732,6 +790,8 @@ function openSrvSemana(wk){
   document.getElementById('srv-agua-prov').value=srv.agua_prov||'';
   document.getElementById('srv-alarma-e').value=srv.alarma_e||'No instalada';
   document.getElementById('srv-alarma-p').value=srv.alarma_p||'';
+  document.getElementById('srv-camaras-e').value=srv.camaras_e||'No instaladas';
+  document.getElementById('srv-internet-e').value=srv.internet_e||'No instalado';
   extRows = srv.extintores ? JSON.parse(JSON.stringify(srv.extintores)) : [];
   renderExtList();
   document.getElementById('srv-obs').value=srv.obs||'';
@@ -750,6 +810,8 @@ function guardarSrv(){
     agua_prov:document.getElementById('srv-agua-prov').value,
     alarma_e:document.getElementById('srv-alarma-e').value,
     alarma_p:document.getElementById('srv-alarma-p').value,
+    camaras_e:document.getElementById('srv-camaras-e').value,
+    internet_e:document.getElementById('srv-internet-e').value,
     extintores:extRows.filter(e=>e.tipo),
     obs:document.getElementById('srv-obs').value
   };
@@ -1184,6 +1246,20 @@ function buildSrvInline(wk){
         ${['Activa','Sin activar','No instalada'].map(v=>`<option value="${v}" ${(srv.alarma_e||'No instalada')===v?'selected':''}>${v}</option>`).join('')}
       </select>
     </div>
+    <label style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.04em;margin-top:2px">📷 Cámaras</label>
+    <div style="display:flex;gap:4px;align-items:center">
+      <select style="flex:1;border:1px solid #c0c8e0;border-radius:4px;padding:2px 4px;font-size:10px"
+        onchange="saveSrvField('${wk}','camaras_e',this.value)">
+        ${['Activas','Sin activar','No instaladas'].map(v=>`<option value="${v}" ${(srv.camaras_e||'No instaladas')===v?'selected':''}>${v}</option>`).join('')}
+      </select>
+    </div>
+    <label style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.04em;margin-top:2px">🌐 Internet</label>
+    <div style="display:flex;gap:4px;align-items:center">
+      <select style="flex:1;border:1px solid #c0d8e0;border-radius:4px;padding:2px 4px;font-size:10px"
+        onchange="saveSrvField('${wk}','internet_e',this.value)">
+        ${['Activo','Sin servicio','No instalado'].map(v=>`<option value="${v}" ${(srv.internet_e||'No instalado')===v?'selected':''}>${v}</option>`).join('')}
+      </select>
+    </div>
     <div style="font-size:8px;color:#4a7a50;margin-top:3px;display:none" id="srv-saved-${id}">✓ guardado</div>
   </div>`;
 }
@@ -1204,6 +1280,80 @@ function saveSrvField(wk, field, val){
   const el=document.getElementById('srv-saved-'+id);
   if(el){el.style.display='block';setTimeout(()=>el.style.display='none',2000);}
 }
+
+
+// ── MODAL EXTINTORES STANDALONE ──
+let extModalRows = [];
+
+function openExtModal(){
+  // Load extintores from current week servicios
+  const wk = wkKey();
+  const srv = (obra.servicios||{})[wk]||{};
+  // Also check most recent week
+  const allWks = Object.keys(obra.servicios||{}).sort();
+  const lastWk = allWks[allWks.length-1];
+  const lastSrv = lastWk ? (obra.servicios[lastWk]||{}) : {};
+  extModalRows = JSON.parse(JSON.stringify(srv.extintores||lastSrv.extintores||[]));
+  renderExtListModal();
+  document.getElementById('ext-modal').classList.add('open');
+}
+function closeExtModal(){
+  document.getElementById('ext-modal').classList.remove('open');
+}
+function renderExtListModal(){
+  const wrap = document.getElementById('ext-list-modal');
+  if(!wrap) return;
+  if(!extModalRows.length){
+    wrap.innerHTML = '<div style="font-size:11px;color:#bbb;padding:8px 0">Sin extintores cargados.</div>';
+    return;
+  }
+  wrap.innerHTML = extModalRows.map((e,i) => {
+    const tipos = ['ABC 10kg','ABC 5kg','CO2','Agua'];
+    return '<div style="background:#f9fafb;border:1px solid #e8eaf0;border-radius:7px;padding:10px 12px;margin-bottom:8px">'
+      +'<div style="font-size:10px;font-weight:700;color:#444;margin-bottom:6px">Extintor '+(i+1)+'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 30px;gap:6px;align-items:end">'
+      +'<div><div style="font-size:9px;color:#888;margin-bottom:2px">Tipo</div>'
+      +'<select onchange="extModalRows['+i+'].tipo=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px">'
+      +tipos.map(t=>'<option value="'+t+'" '+(e.tipo===t?'selected':'')+'>'+t+'</option>').join('')
+      +'</select></div>'
+      +'<div><div style="font-size:9px;color:#888;margin-bottom:2px">Motivo</div>'
+      +'<select onchange="extModalRows['+i+'].motivo=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px">'
+      +'<option value="compra" '+((!e.motivo||e.motivo==="compra")?"selected":"")+'>Compra</option>'
+      +'<option value="recarga" '+(e.motivo==="recarga"?"selected":"")+'>Recarga</option>'
+      +'</select></div>'
+      +'<div><div style="font-size:9px;color:#888;margin-bottom:2px">Vencimiento</div>'
+      +'<input type="date" value="'+(e.venc||'')+'" onchange="extModalRows['+i+'].venc=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px"></div>'
+      +'<div><div style="font-size:9px;color:#888;margin-bottom:2px">Proveedor</div>'
+      +'<input type="text" value="'+(e.prov||'')+'" placeholder="Proveedor" onchange="extModalRows['+i+'].prov=this.value" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:5px 6px;font-size:11px"></div>'
+      +'<button onclick="extModalRows.splice('+i+',1);renderExtListModal()" style="background:#fde8e8;color:#c0392b;border:none;border-radius:5px;height:30px;cursor:pointer;margin-top:14px">✕</button>'
+      +'</div></div>';
+  }).join('');
+}
+function addExtintorModal(){
+  extModalRows.push({tipo:'ABC 10kg',motivo:'compra',venc:'',prov:''});
+  renderExtListModal();
+}
+function guardarExtModal(){
+  // Save extintores to ALL existing service weeks + current week
+  if(!obra.servicios) obra.servicios = {};
+  const wk = wkKey();
+  if(!obra.servicios[wk]){
+    const allWks = Object.keys(obra.servicios).sort();
+    const lastWk = allWks[allWks.length-1];
+    obra.servicios[wk] = lastWk
+      ? JSON.parse(JSON.stringify(obra.servicios[lastWk]))
+      : {banio_u:0,banio_l:0,banio_prov:'',agua_d:0,agua_b:0,agua_prov:'',alarma_e:'No instalada',alarma_p:'',obs:''};
+  }
+  // Update extintores in current week
+  obra.servicios[wk].extintores = extModalRows.filter(e=>e.tipo);
+  // Also propagate to future weeks that share same extintor list
+  Object.keys(obra.servicios).filter(k=>k>=wk).forEach(k=>{
+    obra.servicios[k].extintores = JSON.parse(JSON.stringify(extModalRows.filter(e=>e.tipo)));
+  });
+  closeExtModal();
+  _saveData();showSaveOK();renderSrvSB();
+}
+document.getElementById('ext-modal').addEventListener('click',function(e){if(e.target===this)closeExtModal();});
 
 // ── INIT ──
 (async()=>{
