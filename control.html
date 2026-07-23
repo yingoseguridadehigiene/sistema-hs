@@ -117,6 +117,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f7;color:#1a2332;mi
   <button class="nav-tab active" onclick="setView('tablero')">📊 Tablero</button>
   <button class="nav-tab" onclick="setView('gantt')">📅 Gantt comparativo</button>
   <button class="nav-tab" onclick="setView('servicios')">🔧 Servicios</button>
+  <button class="nav-tab" onclick="setView('docs')">📄 Documentos</button>
   <button class="nav-tab" onclick="setView('costos')">💰 Centro de costos</button>
   <div class="nav-right">
     <span class="sync-ind" id="sync-ind">—</span>
@@ -150,6 +151,15 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f7;color:#1a2332;mi
   <div class="sec-title">Servicios por obra</div>
   <div class="sec-sub">Estado de servicios instalados esta semana</div>
   <div class="srv-table" id="srv-table">
+    <div class="loading"><div class="spin"></div>Cargando...</div>
+  </div>
+</div>
+
+<!-- DOCUMENTOS -->
+<div class="view" id="view-docs">
+  <div class="sec-title">Documentos por obra</div>
+  <div class="sec-sub">Programa de Seguridad y Plan de trabajo vigentes</div>
+  <div class="srv-table" id="docs-table">
     <div class="loading"><div class="spin"></div>Cargando...</div>
   </div>
 </div>
@@ -333,6 +343,7 @@ function renderView() {
   if (activeView === 'tablero') renderTablero();
   else if (activeView === 'gantt') renderGantt();
   else if (activeView === 'servicios') renderServicios();
+  else if (activeView === 'docs') renderDocs();
 }
 
 // ── TABLERO ──
@@ -548,6 +559,64 @@ function renderGantt() {
 }
 
 // ── SERVICIOS ──
+// ── DOCUMENTOS POR OBRA ──
+const SB_STORAGE_URL = SB_URL + '/storage/v1';
+const BUCKET = 'obras-docs';
+const DF_META = {
+  ps:   { titulo:'Programa de Seguridad' },
+  plan: { titulo:'Plan de trabajo (Arq.)' }
+};
+
+function getDocFijo(obra, tipo){
+  return ((obra&&obra.archivos)||[]).filter(function(f){ return f.tipo===tipo; })[0] || null;
+}
+
+function celdaDoc(obraId, tipo){
+  const obra = obrasData[obraId];
+  const f = getDocFijo(obra, tipo);
+  if(!f) return '<span class="srv-tag srv-warn">Sin cargar</span>';
+  if(!f.path) return '<span class="srv-tag srv-nd">Registro sin archivo</span>';
+  return '<button onclick="verDocCtrl(\''+obraId+'\',\''+tipo+'\')" '
+    + 'style="font-size:10px;color:#1a4fa0;background:#fff;padding:4px 9px;border:1px solid #1a4fa0;border-radius:4px;cursor:pointer">Ver</button>'
+    + '<div style="font-size:9px;color:#888;margin-top:3px">' + f.name + '</div>'
+    + '<div style="font-size:9px;color:#aaa">' + (f.fecha||'') + '</div>';
+}
+
+function verDocCtrl(obraId, tipo){
+  const f = getDocFijo(obrasData[obraId], tipo);
+  if(!f || !f.path) return;
+  const w = window.open('', '_blank');
+  fetch(SB_STORAGE_URL + '/object/sign/' + BUCKET + '/' + f.path, {
+    method:'POST', headers: jhdrs(), body: JSON.stringify({ expiresIn: 3600 })
+  }).then(function(r){ return r.json(); })
+  .then(function(d){
+    if(!d.signedURL) throw new Error(d.message||'No se pudo firmar');
+    w.location.href = SB_STORAGE_URL + d.signedURL;
+  }).catch(function(e){
+    if(w) w.close();
+    alert('No se pudo abrir el documento: ' + e.message);
+  });
+}
+
+function renderDocs(){
+  const rows = OBRAS_CONFIG.map(function(cfg){
+    const obra = obrasData[cfg.id];
+    const nombre = (obra && obra.nombre) || cfg.nombre;
+    if(!obra) return '<tr><td><span style="color:'+cfg.color+';font-weight:700">●</span> '+nombre+'</td>'
+      + '<td colspan="2" style="color:#bbb;font-style:italic">Sin datos</td></tr>';
+    return '<tr>'
+      + '<td><a href="'+cfg.file+'" style="color:'+cfg.color+';font-weight:700;text-decoration:none">● '+nombre+'</a></td>'
+      + '<td>'+celdaDoc(cfg.id,'ps')+'</td>'
+      + '<td>'+celdaDoc(cfg.id,'plan')+'</td>'
+      + '</tr>';
+  }).join('');
+
+  document.getElementById('docs-table').innerHTML =
+    '<table><thead><tr>'
+    + '<th>Obra</th><th>Programa de Seguridad</th><th>Plan de trabajo (Arq.)</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
 function renderServicios() {
   const wk = wkKey();
   // Get most recent servicios at or before current week for each obra
