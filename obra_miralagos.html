@@ -767,18 +767,44 @@ function renderSrvSB(){
   if(pEl)pEl.textContent=pCount+' operario'+(pCount===1?'':'s')+' cargado'+(pCount===1?'':'s');
 }
 
-function barRow(label,color,evArr,type){
+function barRow(label,color,evArr,type,opts){
+  opts=opts||{};
   const bars=evArr.map((ev,i)=>{
     const l=pct(ev.inicio),w=(ev.inicio===ev.fin||type==='cap'||type==='insp')?null:wPct(ev.inicio,ev.fin);
     const isPt=(ev.inicio===ev.fin)||type==='cap'||type==='insp';
-    const style=isPt?`left:${l}%`:`left:${l}%;width:${w}%`;
+    let style=isPt?`left:${l}%`:`left:${l}%;width:${w}%`;
+    if(opts.color) style+=`;background:${opts.color}`;
     const lbl=(!isPt&&w>8)?ev.desc.slice(0,22)+(ev.desc.length>22?'...':''):(type==='insp'?'':'');
-    return`<div class="gbar ${type}" style="${style}" title="${ev.desc}${ev.obs?'  -  '+ev.obs:''}" onclick="clickBar(${i},'${type}')">${lbl}</div>`;
+    const idx=opts.planKey!==undefined?`${i},'${type}','${(opts.planKey+'').replace(/'/g,"")}'`:`${i},'${type}'`;
+    return`<div class="gbar ${type}" style="${style}" title="${ev.desc}${ev.obs?'  -  '+ev.obs:''}" onclick="clickBar(${idx})">${lbl}</div>`;
   }).join('');
+  const rowId=opts.rowId||type;
   return`<div class="gantt-row">
-    <div class="grl"><div class="grl-dot" style="background:${color}"></div><div class="grl-txt">${label}</div></div>
-    <div class="gantt-row-bars">${bars}<div class="gantt-today" id="gt-${type}" style="display:none"></div></div>
+    <div class="grl"><div class="grl-dot" style="background:${color}"></div><div class="grl-txt">${label}</div>${opts.delPlan?`<button onclick="eliminarPlan('${(opts.delPlan+'').replace(/'/g,"")}')" title="Eliminar este plan de la línea de tiempo" style="background:none;border:none;color:#c0392b;font-size:13px;cursor:pointer;padding:0 2px;line-height:1">×</button>`:''}</div>
+    <div class="gantt-row-bars">${bars}<div class="gantt-today" id="gt-${rowId}" style="display:none"></div></div>
   </div>`;
+}
+
+// -- PLANES DE TRABAJO (uno o varios) --
+const PLAN_COLORES=['#c0392b','#0e7c86','#b8860b','#6a1b9a','#2e7d32','#c2185b','#455a64'];
+function planNombre(ev){ return ev.plan || 'Plan de trabajo (Arq.)'; }
+function eliminarPlan(nombre){
+  const evs=(obra.eventos||[]).filter(e=>e.type==='plan'&&planNombre(e)===nombre);
+  if(!evs.length)return;
+  if(!confirm('¿Eliminar el plan "'+nombre+'" de la línea de tiempo?\n\n'
+    +'Se borrarán '+evs.length+' etapas. Los archivos PDF cargados en la pastilla '
+    +'"Plan de trabajo" NO se borran: eso se hace por separado desde ahí.'))return;
+  obra.eventos=(obra.eventos||[]).filter(e=>!(e.type==='plan'&&planNombre(e)===nombre));
+  _saveData();showSaveOK();renderTL();
+}
+
+function planesDeObra(){
+  const evs=(obra.eventos||[]).filter(e=>e.type==='plan');
+  const map=new Map();
+  evs.forEach(e=>{ const k=planNombre(e); if(!map.has(k))map.set(k,[]); map.get(k).push(e); });
+  return Array.from(map.entries()).map(([nombre,eventos],i)=>({
+    nombre, eventos, color:PLAN_COLORES[i%PLAN_COLORES.length], key:'plan'+i
+  }));
 }
 
 function buildSrvEvs(){
@@ -795,6 +821,7 @@ function renderTL(){
   if(!obra.inicio||!obra.fin){document.getElementById('tl-wrap').innerHTML='<div style="padding:20px;color:#888;font-size:12px">Completá la información de la obra para ver la línea de tiempo.</div>';return;}
   const evs=obra.eventos||[];
   const planEvs=evs.filter(e=>e.type==='plan');
+  const planes=planesDeObra();
   const srvEvs=buildSrvEvs();
   const etapas=evs.filter(e=>e.type==='etapa');
   const caps=evs.filter(e=>e.type==='cap');
@@ -813,7 +840,7 @@ function renderTL(){
   <div class="tl-wrap">
     <div class="tl-head">
       <span class="tl-title">Línea de tiempo  -  ${obra.nombre||''}</span>
-      <div class="leg"><div class="leg-pill" style="background:#c0392b"></div>Plan Arq.</div>
+      ${planes.map(p=>`<div class="leg"><div class="leg-pill" style="background:${p.color}"></div>${p.nombre}</div>`).join('')}
 
       <div class="leg"><div class="leg-pill" style="background:#1a4fa0"></div>Etapas HyS</div>
       <div class="leg"><div class="leg-pill" style="background:#1a6b2e"></div>Capacitaciones</div>
@@ -822,7 +849,7 @@ function renderTL(){
     </div>
     <div class="gantt-table"><div class="gantt-inner">
       <div class="gantt-months" style="padding-left:160px">${mHead}</div>
-      ${planEvs.length?barRow('Plan de trabajo (Arq.)','#c0392b',planEvs,'plan'):''}
+      ${planes.map(p=>barRow(p.nombre,p.color,p.eventos,'plan',{color:p.color,planKey:p.nombre,rowId:p.key,delPlan:p.nombre})).join('')}
 
       ${barRow('Etapas constructivas','#1a4fa0',etapas,'etapa')}
       ${barRow('Capacitaciones','#1a6b2e',caps,'cap')}
@@ -847,13 +874,13 @@ function renderTL(){
 
 function setTodayLine(){
   const todayPct=pct(new Date().toISOString().slice(0,10));
-  ['plan','servicios','etapa','cap','insp'].forEach(t=>{
+  planesDeObra().map(p=>p.key).concat(['plan','servicios','etapa','cap','insp']).forEach(t=>{
     const el=document.getElementById('gt-'+t);
     if(el){el.style.display='block';el.style.left=todayPct+'%';}
   });
 }
 
-function clickBar(idx,type){
+function clickBar(idx,type,planKey){
   if(type==='insp'){
     // Find matching inspección by evento index
     const evs=(obra.eventos||[]).filter(e=>e.type==='insp');
@@ -869,8 +896,10 @@ function clickBar(idx,type){
       document.getElementById('insp-inspector').value=ev.inspector||'';
     }
   } else {
-    const evs=(obra.eventos||[]).filter(e=>e.type===type);
-    if(evs[idx])alert(evs[idx].desc+(evs[idx].obs?'\n'+evs[idx].obs:'')+'\n'+fmtD(evs[idx].inicio)+' -> '+fmtD(evs[idx].fin));
+    let evs=(obra.eventos||[]).filter(e=>e.type===type);
+    if(type==='plan'&&planKey) evs=evs.filter(e=>planNombre(e)===planKey);
+    const ev=evs[idx];
+    if(ev)alert((type==='plan'?planNombre(ev)+'\n\n':'')+ev.desc+(ev.obs?'\n'+ev.obs:'')+'\n'+fmtD(ev.inicio)+' -> '+fmtD(ev.fin));
   }
 }
 
@@ -1258,21 +1287,24 @@ function imprimirConstancia(idx){
 
 // -- DOCUMENTOS FIJOS (Prog. Seguridad / Plan de trabajo) --
 const DF_META = {
-  ps:   { titulo:'📄 Programa de Seguridad', carpeta:'_prog_seguridad', sub:'Documento vigente de la obra' },
-  plan: { titulo:'📐 Plan de trabajo',       carpeta:'_plan_trabajo',   sub:'Plan de arquitectura vigente' }
+  ps:   { titulo:'📄 Programa de Seguridad', carpeta:'_prog_seguridad', sub:'Documento vigente de la obra', multi:false },
+  plan: { titulo:'📐 Plan de trabajo',       carpeta:'_plan_trabajo',   sub:'Planes de arquitectura (podés cargar varios)', multi:true }
 };
 var currentDF = null;
 
-function getDocFijo(tipo){
-  return (obra.archivos||[]).filter(function(f){ return f.tipo===tipo; })[0] || null;
+function getDocsFijos(tipo){
+  return (obra.archivos||[]).filter(function(f){ return f.tipo===tipo; });
 }
+function getDocFijo(tipo){ return getDocsFijos(tipo)[0] || null; }
 
 function openDocFijo(tipo){
   currentDF = tipo;
   document.getElementById('df-title').textContent = DF_META[tipo].titulo;
   document.getElementById('df-sub').textContent   = DF_META[tipo].sub;
   document.getElementById('df-status').textContent = '';
-  document.getElementById('df-file').value = '';
+  var inp = document.getElementById('df-file');
+  inp.value = '';
+  if(DF_META[tipo].multi) inp.setAttribute('multiple','multiple'); else inp.removeAttribute('multiple');
   renderDocFijo();
   document.getElementById('docfijo-modal').classList.add('open');
 }
@@ -1280,31 +1312,39 @@ function closeDocFijo(){
   document.getElementById('docfijo-modal').classList.remove('open');
 }
 
-function renderDocFijo(){
-  var f = getDocFijo(currentDF);
-  var wrap = document.getElementById('df-actual');
-  var up   = document.getElementById('df-uplabel');
-  if(!f){
-    wrap.innerHTML = '<div style="font-size:11px;color:#bbb;padding:10px 0;text-align:center">No hay documento cargado para esta obra.</div>';
-    up.textContent = 'Cargar archivo';
-    return;
-  }
-  up.textContent = 'Reemplazar archivo';
+function _filaDocFijo(f, idx){
   var legacy = !f.path;
-  wrap.innerHTML = '<div style="display:flex;align-items:center;gap:10px;border:1px solid #e8eaf0;border-radius:8px;padding:12px">'
-    + '<span style="font-size:26px">📄</span>'
+  return '<div style="display:flex;align-items:center;gap:10px;border:1px solid #e8eaf0;border-radius:8px;padding:10px 12px;margin-bottom:6px">'
+    + '<span style="font-size:22px">📄</span>'
     + '<div style="flex:1;min-width:0">'
-      + '<div style="font-size:12px;font-weight:700;color:#1a2332;overflow:hidden;text-overflow:ellipsis">' + f.name + '</div>'
+      + '<div style="font-size:12px;font-weight:700;color:#1a2332;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</div>'
       + '<div style="font-size:9px;color:#888">Cargado el ' + (f.fecha||'-') + (f.size?' &middot; '+Math.round(f.size/1024)+' KB':'') + '</div>'
       + (legacy?'<div style="font-size:9px;color:#c0392b;margin-top:3px">Registro antiguo sin archivo adjunto. Volvé a subirlo.</div>':'')
     + '</div>'
-    + (legacy?'':'<button onclick="verDocFijo()" style="font-size:10px;color:#1a4fa0;background:#fff;padding:5px 10px;border:1px solid #1a4fa0;border-radius:4px;cursor:pointer">Ver</button>')
-    + '<button onclick="eliminarDocFijo()" style="background:#fde8e8;color:#c0392b;border:none;border-radius:4px;padding:5px 9px;font-size:10px;cursor:pointer">x</button>'
+    + (legacy?'':'<button onclick="verDocFijo('+idx+')" style="font-size:10px;color:#1a4fa0;background:#fff;padding:5px 10px;border:1px solid #1a4fa0;border-radius:4px;cursor:pointer">Ver</button>')
+    + '<button onclick="eliminarDocFijo('+idx+')" style="background:#fde8e8;color:#c0392b;border:none;border-radius:4px;padding:5px 9px;font-size:10px;cursor:pointer">x</button>'
     + '</div>';
 }
 
-function verDocFijo(){
-  var f = getDocFijo(currentDF);
+function renderDocFijo(){
+  var lista = getDocsFijos(currentDF);
+  var wrap = document.getElementById('df-actual');
+  var up   = document.getElementById('df-uplabel');
+  var multi = DF_META[currentDF].multi;
+  if(!lista.length){
+    wrap.innerHTML = '<div style="font-size:11px;color:#bbb;padding:10px 0;text-align:center">No hay documentos cargados para esta obra.</div>';
+    up.textContent = multi ? 'Agregar archivos' : 'Cargar archivo';
+    return;
+  }
+  up.textContent = multi ? 'Agregar más archivos' : 'Reemplazar archivo';
+  wrap.innerHTML = (multi
+      ? '<div style="font-size:10px;color:#888;margin-bottom:6px">'+lista.length+(lista.length===1?' archivo cargado':' archivos cargados')+'</div>'
+      : '')
+    + lista.map(_filaDocFijo).join('');
+}
+
+function verDocFijo(idx){
+  var f = getDocsFijos(currentDF)[idx||0];
   if(!f || !f.path) return;
   var w = window.open('', '_blank');
   fetch(SB_STORAGE_URL + '/object/sign/' + BUCKET + '/' + f.path, {
@@ -1321,45 +1361,56 @@ function verDocFijo(){
 
 function subirDocFijo(){
   var input = document.getElementById('df-file');
-  var file = input.files[0];
+  var files = Array.prototype.slice.call(input.files||[]);
   var st = document.getElementById('df-status');
-  if(!file){ st.textContent='Elegí un archivo primero.'; st.style.color='#c0392b'; return; }
-  st.textContent='Subiendo...'; st.style.color='#856404';
+  if(!files.length){ st.textContent='Elegí al menos un archivo.'; st.style.color='#c0392b'; return; }
 
-  var prev = getDocFijo(currentDF);
   var tipo = currentDF;
-  var path = OBRA_ID + '/' + DF_META[tipo].carpeta + '/' + Date.now() + '_' + file.name.replace(/\s/g,'_');
+  var multi = DF_META[tipo].multi;
+  if(!multi) files = files.slice(0,1);
 
-  fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + path, {
-    method:'POST', headers: hdrs({ 'Content-Type': file.type, 'x-upsert':'true' }), body: file
-  }).then(function(r){
-    if(!r.ok) throw new Error('No se pudo subir el archivo');
-    if(prev && prev.path){
-      fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + prev.path, { method:'DELETE', headers: hdrs() });
-    }
-    if(!obra.archivos) obra.archivos=[];
-    obra.archivos = obra.archivos.filter(function(f){ return f.tipo!==tipo; });
-    obra.archivos.push({
-      name:file.name, size:file.size, path:path, type:file.type,
-      fecha:new Date().toLocaleDateString('es-AR'), tipo:tipo
+  st.textContent = 'Subiendo ' + files.length + (files.length===1?' archivo...':' archivos...');
+  st.style.color = '#856404';
+
+  var previos = multi ? [] : getDocsFijos(tipo);
+
+  var tareas = files.map(function(file){
+    var path = OBRA_ID + '/' + DF_META[tipo].carpeta + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,7) + '_' + file.name.replace(/\s/g,'_');
+    return fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + path, {
+      method:'POST', headers: hdrs({ 'Content-Type': file.type, 'x-upsert':'true' }), body: file
+    }).then(function(r){
+      if(!r.ok) throw new Error('No se pudo subir "' + file.name + '"');
+      return { name:file.name, size:file.size, path:path, type:file.type,
+               fecha:new Date().toLocaleDateString('es-AR'), tipo:tipo };
     });
+  });
+
+  Promise.all(tareas).then(function(nuevos){
+    previos.forEach(function(p){
+      if(p.path) fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + p.path, { method:'DELETE', headers: hdrs() });
+    });
+    if(!obra.archivos) obra.archivos=[];
+    if(!multi) obra.archivos = obra.archivos.filter(function(f){ return f.tipo!==tipo; });
+    obra.archivos = obra.archivos.concat(nuevos);
     _saveData();
     input.value='';
-    st.textContent='Archivo cargado.'; st.style.color='#1a6b2e';
+    st.textContent = nuevos.length + (nuevos.length===1?' archivo cargado.':' archivos cargados.');
+    st.style.color='#1a6b2e';
     renderDocFijo(); renderDFBadges();
     setTimeout(function(){ st.textContent=''; },3000);
   }).catch(function(e){
     st.textContent='Error: '+e.message; st.style.color='#c0392b';
+    renderDocFijo(); renderDFBadges();
   });
 }
 
-function eliminarDocFijo(){
-  if(!confirm('Eliminar este documento?')) return;
-  var f = getDocFijo(currentDF);
-  if(f && f.path){
-    fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + f.path, { method:'DELETE', headers: hdrs() });
-  }
-  obra.archivos = (obra.archivos||[]).filter(function(x){ return x.tipo!==currentDF; });
+function eliminarDocFijo(idx){
+  var lista = getDocsFijos(currentDF);
+  var f = lista[idx||0];
+  if(!f) return;
+  if(!confirm('Eliminar "' + f.name + '"?')) return;
+  if(f.path) fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + f.path, { method:'DELETE', headers: hdrs() });
+  obra.archivos = (obra.archivos||[]).filter(function(x){ return x!==f; });
   _saveData();
   renderDocFijo(); renderDFBadges();
 }
@@ -1367,7 +1418,8 @@ function eliminarDocFijo(){
 function renderDFBadges(){
   [['ps','btn-ps','📄 Prog. Seguridad'],['plan','btn-plan','📐 Plan de trabajo']].forEach(function(t){
     var b=document.getElementById(t[1]); if(!b) return;
-    b.textContent = t[2] + (getDocFijo(t[0]) ? ' ✓' : ' +');
+    var n=getDocsFijos(t[0]).length;
+    b.textContent = t[2] + (n ? (DF_META[t[0]].multi && n>1 ? ' ('+n+')' : ' ✓') : ' +');
   });
 }
 
@@ -1417,11 +1469,13 @@ function procesarImportJSON(){
     }else{
       if(parsed.obra_inicio&&!obra.inicio)obra.inicio=parsed.obra_inicio;
       if(parsed.obra_fin&&!obra.fin)obra.fin=parsed.obra_fin;
-      obra.eventos=(obra.eventos||[]).filter(e=>e.type!=='plan');
+      const nombrePlan=(parsed.plan_nombre||parsed.obra_nombre||'Plan de trabajo (Arq.)').trim();
+      // reemplaza solo las etapas de ESTE plan; los demás planes se conservan
+      obra.eventos=(obra.eventos||[]).filter(e=>e.type!=='plan'||planNombre(e)!==nombrePlan);
       const etapas=parsed.etapas||parsed.eventos||[];
       etapas.forEach(item=>{
         if(item.desc&&item.inicio&&item.fin){
-          obra.eventos.push({type:'plan',desc:item.desc+(item.grupo?' ('+item.grupo+')':''),inicio:item.inicio,fin:item.fin,obs:item.grupo||''});
+          obra.eventos.push({type:'plan',plan:nombrePlan,desc:item.desc+(item.grupo?' ('+item.grupo+')':''),inicio:item.inicio,fin:item.fin,obs:item.grupo||''});
           added++;
         }
       });
