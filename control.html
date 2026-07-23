@@ -598,22 +598,98 @@ function verDocCtrl(obraId, tipo){
   });
 }
 
+function iconDoc(t){
+  if(!t) return '📎';
+  if(t.indexOf('pdf')>=0) return '📄';
+  if(t.indexOf('image')>=0) return '🖼';
+  if(t.indexOf('word')>=0) return '📝';
+  if(t.indexOf('excel')>=0||t.indexOf('sheet')>=0) return '📊';
+  return '📎';
+}
+
+function wkLabel(wk){
+  // 2025-W07 -> "Sem 07 · 2025"
+  var m=/^(\d{4})-W(\d{2})$/.exec(wk||'');
+  return m ? ('Sem '+m[2]+' · '+m[1]) : (wk||'—');
+}
+
+function docsSemanales(obra){
+  // devuelve [{wk, docs:[...]}] ordenado de mas reciente a mas viejo
+  var d=(obra&&obra.docs)||{};
+  return Object.keys(d).filter(function(k){ return (d[k]||[]).length; })
+    .sort().reverse().map(function(k){ return {wk:k, docs:d[k]}; });
+}
+
+function verDocSem(obraId, wk, i){
+  var d=((obrasData[obraId]||{}).docs||{})[wk]||[];
+  var doc=d[i];
+  if(!doc) return;
+  if(!doc.path){ if(doc.url) window.open(doc.url,'_blank'); return; }
+  var w=window.open('','_blank');
+  fetch(SB_STORAGE_URL + '/object/sign/' + BUCKET + '/' + doc.path, {
+    method:'POST', headers: jhdrs(), body: JSON.stringify({ expiresIn: 3600 })
+  }).then(function(r){ return r.json(); })
+  .then(function(x){
+    if(!x.signedURL) throw new Error(x.message||'No se pudo firmar');
+    w.location.href = SB_STORAGE_URL + x.signedURL;
+  }).catch(function(e){
+    if(w) w.close();
+    alert('No se pudo abrir el documento: ' + e.message);
+  });
+}
+
+var _docsOpen = {};
+function toggleDocsObra(obraId){
+  _docsOpen[obraId] = !_docsOpen[obraId];
+  renderDocs();
+}
+
 function renderDocs(){
-  const rows = OBRAS_CONFIG.map(function(cfg){
-    const obra = obrasData[cfg.id];
-    const nombre = (obra && obra.nombre) || cfg.nombre;
+  var rows = OBRAS_CONFIG.map(function(cfg){
+    var obra = obrasData[cfg.id];
+    var nombre = (obra && obra.nombre) || cfg.nombre;
     if(!obra) return '<tr><td><span style="color:'+cfg.color+';font-weight:700">●</span> '+nombre+'</td>'
-      + '<td colspan="2" style="color:#bbb;font-style:italic">Sin datos</td></tr>';
-    return '<tr>'
+      + '<td colspan="3" style="color:#bbb;font-style:italic">Sin datos</td></tr>';
+
+    var sem = docsSemanales(obra);
+    var total = sem.reduce(function(a,g){ return a+g.docs.length; },0);
+    var abierto = !!_docsOpen[cfg.id];
+
+    var celdaSem = total
+      ? '<button onclick="toggleDocsObra(\''+cfg.id+'\')" style="font-size:10px;color:#1a4fa0;background:#fff;padding:4px 9px;border:1px solid #1a4fa0;border-radius:4px;cursor:pointer">'
+        + (abierto?'▾ ':'▸ ') + total + (total===1?' archivo':' archivos') + '</button>'
+        + '<div style="font-size:9px;color:#888;margin-top:3px">' + sem.length + (sem.length===1?' semana':' semanas') + '</div>'
+      : '<span style="font-size:10px;color:#bbb">Sin documentos</span>';
+
+    var fila = '<tr>'
       + '<td><a href="'+cfg.file+'" style="color:'+cfg.color+';font-weight:700;text-decoration:none">● '+nombre+'</a></td>'
       + '<td>'+celdaDoc(cfg.id,'ps')+'</td>'
       + '<td>'+celdaDoc(cfg.id,'plan')+'</td>'
+      + '<td>'+celdaSem+'</td>'
       + '</tr>';
+
+    if(abierto && total){
+      var detalle = sem.map(function(g){
+        var items = g.docs.map(function(doc,i){
+          return '<div style="display:flex;align-items:center;gap:7px;padding:3px 0">'
+            + '<span>'+iconDoc(doc.type)+'</span>'
+            + '<span style="flex:1;font-size:10px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+doc.name+'</span>'
+            + '<span style="font-size:9px;color:#aaa">'+(doc.fecha||'')+'</span>'
+            + '<button onclick="verDocSem(\''+cfg.id+'\',\''+g.wk+'\','+i+')" style="font-size:9px;color:#1a4fa0;background:#fff;padding:2px 7px;border:1px solid #1a4fa0;border-radius:3px;cursor:pointer">Ver</button>'
+            + '</div>';
+        }).join('');
+        return '<div style="margin-bottom:9px">'
+          + '<div style="font-size:10px;font-weight:700;color:#1a2332;border-bottom:1px solid #e8eaf0;padding-bottom:2px;margin-bottom:3px">'+wkLabel(g.wk)+'</div>'
+          + items + '</div>';
+      }).join('');
+      fila += '<tr><td colspan="4" style="background:#f7f8fa;padding:10px 14px">'+detalle+'</td></tr>';
+    }
+    return fila;
   }).join('');
 
   document.getElementById('docs-table').innerHTML =
     '<table><thead><tr>'
-    + '<th>Obra</th><th>Programa de Seguridad</th><th>Plan de trabajo (Arq.)</th>'
+    + '<th>Obra</th><th>Programa de Seguridad</th><th>Plan de trabajo (Arq.)</th><th>Documentos por semana</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
