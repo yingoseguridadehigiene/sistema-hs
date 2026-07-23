@@ -375,6 +375,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
   <div class="modal" style="width:680px;max-height:90vh">
     <div class="mhd">
       <div><h3>👷 Personal de obra</h3><div class="mhd-sub">Ropa de trabajo y EPP entregado</div></div>
+      <button class="btn-sm btn-gray" style="margin-right:8px" onclick="imprimirConstancia('all')">🖨 Constancias 299/11</button>
       <button class="mx" onclick="closePersonalModal()">✕</button>
     </div>
     <div class="mbody">
@@ -394,6 +395,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
     </div>
     <div class="mbody">
       <div class="field"><label>Apellido y nombre</label><input type="text" id="op-nombre" placeholder="Ej: Pérez Juan"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>DNI / CUIL</label><input type="text" id="op-dni" placeholder="Ej: 20-12345678-9"></div>
+        <div class="field"><label>Puesto / Sector</label><input type="text" id="op-puesto" placeholder="Ej: Oficial albañil"></div>
+      </div>
 
       <div class="cat-head" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center">
         <span>👕 Ropa de trabajo — historial de entregas</span>
@@ -413,6 +418,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
     </div>
     <div class="mfoot">
       <button class="btn-cancel" style="background:#fde8e8;color:#c0392b" id="op-del-btn" onclick="eliminarOperario()" style="display:none">🗑 Eliminar</button>
+      <button class="btn-cancel" style="background:#e8f0fb;color:#1a4fa0" id="op-print-btn" onclick="imprimirConstancia(editingOpIdx)">🖨 Constancia 299/11</button>
       <button class="btn-cancel" onclick="closeOperarioForm()">Cancelar</button>
       <button class="btn-save" onclick="guardarOperario()">Guardar</button>
     </div>
@@ -1115,6 +1121,141 @@ function guardarChk(){
 }
 document.getElementById('chk-modal').addEventListener('click',function(e){if(e.target===this)closeChk();});
 
+
+// -- CONSTANCIA DE ENTREGA DE EPP - Res. SRT 299/11 --
+const EMPRESA_299 = {
+  razon: 'YINGO S.A.',
+  cuit: '30-71597457-2',
+  domicilio: 'Calle 9 N° 2093 - La Plata, Buenos Aires'
+};
+
+function _esc(t){
+  return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function _fechaAR(f){
+  if(!f) return '';
+  var p=String(f).split('-');
+  return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : f;
+}
+
+function _filasConstancia(op){
+  var rows=[];
+  (op.ropa||[]).forEach(function(r){ rows.push({fecha:r.fecha,prod:r.item,cant:r.cant,clase:'Ropa de trabajo'}); });
+  (op.epp||[]).forEach(function(r){ rows.push({fecha:r.fecha,prod:r.item,cant:r.cant,clase:'EPP'}); });
+  rows.sort(function(a,b){ return String(a.fecha||'').localeCompare(String(b.fecha||'')); });
+  return rows;
+}
+
+function _hojaConstancia(op){
+  var filas=_filasConstancia(op);
+  var minFilas=16;
+  var cuerpo=filas.map(function(r){
+    return '<tr>'
+      + '<td class="c">'+_esc(_fechaAR(r.fecha))+'</td>'
+      + '<td>'+_esc(r.prod)+'</td>'
+      + '<td class="c">'+_esc(r.clase)+'</td>'
+      + '<td class="c">'+_esc(r.cant||'')+'</td>'
+      + '<td></td><td></td><td class="firma"></td>'
+      + '</tr>';
+  }).join('');
+  for(var i=filas.length;i<minFilas;i++){
+    cuerpo += '<tr><td class="c">&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td class="firma"></td></tr>';
+  }
+
+  return ''
+  + '<div class="hoja">'
+  + '  <div class="tit">CONSTANCIA DE ENTREGA DE ROPA DE TRABAJO Y<br>ELEMENTOS DE PROTECCI&Oacute;N PERSONAL</div>'
+  + '  <div class="sub">Resoluci&oacute;n S.R.T. N&deg; 299/2011 &mdash; Anexo &mdash; Ley 19.587 / Decreto 911/96</div>'
+  + '  <table class="datos">'
+  + '    <tr><td class="lb">Raz&oacute;n social</td><td>'+_esc(EMPRESA_299.razon)+'</td>'
+  +        '<td class="lb">C.U.I.T.</td><td>'+_esc(EMPRESA_299.cuit)+'</td></tr>'
+  + '    <tr><td class="lb">Domicilio</td><td colspan="3">'+_esc(EMPRESA_299.domicilio)+'</td></tr>'
+  + '    <tr><td class="lb">Obra / Establecimiento</td><td>'+_esc(obra.nombre||'')+'</td>'
+  +        '<td class="lb">A.R.T.</td><td>'+_esc(obra.art||'')+'</td></tr>'
+  + '  </table>'
+  + '  <table class="datos">'
+  + '    <tr><td class="lb">Apellido y nombre</td><td colspan="3">'+_esc(op.nombre||'')+'</td></tr>'
+  + '    <tr><td class="lb">D.N.I. / C.U.I.L.</td><td>'+_esc(op.dni||'')+'</td>'
+  +        '<td class="lb">Puesto / Sector</td><td>'+_esc(op.puesto||'')+'</td></tr>'
+  + '  </table>'
+  + '  <table class="items">'
+  + '    <thead><tr>'
+  + '      <th style="width:12%">Fecha de<br>entrega</th>'
+  + '      <th style="width:26%">Producto entregado</th>'
+  + '      <th style="width:12%">Tipo</th>'
+  + '      <th style="width:7%">Cant.</th>'
+  + '      <th style="width:14%">Marca /<br>Modelo</th>'
+  + '      <th style="width:14%">Certificaci&oacute;n<br>(Norma IRAM)</th>'
+  + '      <th style="width:15%">Firma del<br>trabajador</th>'
+  + '    </tr></thead>'
+  + '    <tbody>'+cuerpo+'</tbody>'
+  + '  </table>'
+  + '  <div class="decl">'
+  + '    Por la presente dejo constancia de haber recibido sin cargo los elementos de protecci&oacute;n personal y la ropa de '
+  + '    trabajo detallados precedentemente, adecuados a los riesgos de mi puesto de trabajo. Asimismo declaro haber sido '
+  + '    <b>capacitado sobre su uso correcto, conservaci&oacute;n y mantenimiento</b>, y me comprometo a utilizarlos durante toda '
+  + '    la jornada laboral, a conservarlos en buen estado y a solicitar su reposici&oacute;n ante deterioro, p&eacute;rdida o '
+  + '    vencimiento, conforme lo establecido en la Ley 19.587 de Higiene y Seguridad en el Trabajo, el Decreto 911/96 y la '
+  + '    Resoluci&oacute;n S.R.T. N&deg; 299/2011.'
+  + '  </div>'
+  + '  <table class="firmas">'
+  + '    <tr>'
+  + '      <td><div class="ln"></div>Firma del trabajador</td>'
+  + '      <td><div class="ln"></div>Aclaraci&oacute;n</td>'
+  + '      <td><div class="ln"></div>Firma y sello del empleador</td>'
+  + '    </tr>'
+  + '  </table>'
+  + '  <div class="pie">Lugar y fecha: ____________________________________ &nbsp;&nbsp; '
+  + '  Documento generado por el Sistema HyS &mdash; ' + _esc(EMPRESA_299.razon) + '</div>'
+  + '</div>';
+}
+
+function imprimirConstancia(idx){
+  var lista;
+  if(idx==='all'){
+    lista=(obra.personal||[]);
+    if(!lista.length){ alert('No hay operarios cargados.'); return; }
+  }else{
+    if(idx===null||idx===undefined){ alert('Guardá el operario antes de imprimir la constancia.'); return; }
+    var op=(obra.personal||[])[idx];
+    if(!op){ alert('No se encontró el operario.'); return; }
+    lista=[op];
+  }
+  var faltantes=lista.filter(function(o){ return !o.dni || !o.puesto; }).length;
+  if(faltantes && !confirm('Hay '+faltantes+' operario(s) sin DNI o puesto cargado. La constancia se imprimirá con esos campos en blanco para completar a mano.\n\n¿Continuar?')) return;
+
+  var css = '@page{size:A4 landscape;margin:12mm}'
+    + '*{box-sizing:border-box}'
+    + 'body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:0;font-size:10px}'
+    + '.hoja{page-break-after:always;padding:0 0 6px 0}'
+    + '.hoja:last-child{page-break-after:auto}'
+    + '.tit{text-align:center;font-size:15px;font-weight:bold;line-height:1.25;margin-bottom:3px}'
+    + '.sub{text-align:center;font-size:9px;margin-bottom:10px}'
+    + 'table{width:100%;border-collapse:collapse;margin-bottom:8px}'
+    + '.datos td{border:1px solid #000;padding:4px 6px;font-size:10px}'
+    + '.datos .lb{background:#eee;font-weight:bold;width:19%;white-space:nowrap}'
+    + '.items th{border:1px solid #000;padding:4px 3px;font-size:9px;background:#eee;text-align:center;line-height:1.2}'
+    + '.items td{border:1px solid #000;padding:5px 5px;font-size:9.5px;height:19px}'
+    + '.items td.c{text-align:center}'
+    + '.items td.firma{background:#fcfcfc}'
+    + '.decl{border:1px solid #000;padding:7px 10px;font-size:9px;text-align:justify;line-height:1.4;margin-bottom:14px}'
+    + '.firmas{margin-top:26px}'
+    + '.firmas td{width:33.33%;text-align:center;font-size:9px;padding:0 26px;vertical-align:bottom}'
+    + '.firmas .ln{border-top:1px solid #000;margin-bottom:3px}'
+    + '.pie{margin-top:14px;font-size:8px;color:#333}'
+    + '@media screen{body{background:#f0f0f0;padding:16px}.hoja{background:#fff;padding:12mm 14mm;margin:0 auto 14px;max-width:297mm;box-shadow:0 1px 5px rgba(0,0,0,.2)}}';
+
+  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+    + '<title>Constancia EPP - Res. 299/11</title><style>'+css+'</style></head><body>'
+    + lista.map(_hojaConstancia).join('')
+    + '<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},350);};</scr'+'ipt>'
+    + '</body></html>';
+
+  var w=window.open('','_blank');
+  if(!w){ alert('El navegador bloqueó la ventana emergente. Permitila para imprimir la constancia.'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
 // -- DOCUMENTOS FIJOS (Prog. Seguridad / Plan de trabajo) --
 const DF_META = {
   ps:   { titulo:'📄 Programa de Seguridad', carpeta:'_prog_seguridad', sub:'Documento vigente de la obra' },
@@ -1358,7 +1499,8 @@ function renderPersonalList(){
         <div style="font-size:12px;font-weight:700;color:#1a2332">${op.nombre||'Sin nombre'}</div>
         <div style="font-size:10px;color:#888;margin-top:2px">👕 ${ropaCount} prendas acumuladas  .  🦺 ${eppCount} ítems EPP acumulados</div>
       </div>
-      <div style="font-size:11px;color:#1a4fa0">Editar Editar</div>
+      <button onclick="event.stopPropagation();imprimirConstancia(${i})" title="Imprimir constancia Res. 299/11" style="background:#e8f0fb;color:#1a4fa0;border:1px solid #b8cde8;border-radius:5px;padding:5px 9px;font-size:10px;cursor:pointer;white-space:nowrap">🖨 Constancia</button>
+      <div style="font-size:11px;color:#1a4fa0">Editar</div>
     </div>`;
   }).join('');
 }
@@ -1368,6 +1510,9 @@ function openOperarioForm(idx){
   const op=idx!==null?obra.personal[idx]:null;
   document.getElementById('op-title').textContent=op?'Editar operario':'Nuevo operario';
   document.getElementById('op-nombre').value=op?op.nombre||'':'';
+  document.getElementById('op-dni').value=op?op.dni||'':'';
+  document.getElementById('op-puesto').value=op?op.puesto||'':'';
+  document.getElementById('op-print-btn').style.display=op?'':'none';
   document.getElementById('op-obs').value=op?op.obs||'':'';
   ropaRows=op&&op.ropa?JSON.parse(JSON.stringify(op.ropa)):[];
   eppRows=op&&op.epp?JSON.parse(JSON.stringify(op.epp)):[];
@@ -1441,6 +1586,8 @@ function guardarOperario(){
   if(!nombre){alert('Ingresá el apellido y nombre del operario.');return;}
   const op={
     nombre,
+    dni:document.getElementById('op-dni').value.trim(),
+    puesto:document.getElementById('op-puesto').value.trim(),
     ropa:ropaRows.filter(r=>r.item),
     epp:eppRows.filter(r=>r.item),
     obs:document.getElementById('op-obs').value
