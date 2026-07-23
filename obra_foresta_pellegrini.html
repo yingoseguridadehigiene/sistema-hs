@@ -130,6 +130,21 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 </style>
 </head>
 <body>
+<div id="auth-gate" style="position:fixed;inset:0;background:#1a2332;z-index:9999;display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:10px;padding:28px 26px;width:300px;box-shadow:0 8px 32px rgba(0,0,0,.4)">
+    <div style="font-size:15px;font-weight:700;color:#1a2332;margin-bottom:2px">Sistema HyS</div>
+    <div style="font-size:11px;color:#888;margin-bottom:18px">Yingo S.A. &mdash; acceso restringido</div>
+    <input id="auth-email" type="email" placeholder="Email" autocomplete="username"
+      style="width:100%;box-sizing:border-box;padding:9px;margin-bottom:8px;border:1px solid #d5dbe4;border-radius:5px;font-size:12px">
+    <input id="auth-pass" type="password" placeholder="Contrase&ntilde;a" autocomplete="current-password"
+      style="width:100%;box-sizing:border-box;padding:9px;margin-bottom:12px;border:1px solid #d5dbe4;border-radius:5px;font-size:12px"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()" id="auth-btn"
+      style="width:100%;background:#1a4fa0;color:#fff;border:none;border-radius:5px;padding:10px;font-size:12px;font-weight:600;cursor:pointer">Ingresar</button>
+    <div id="auth-err" style="font-size:10px;color:#c0392b;margin-top:9px;min-height:13px"></div>
+  </div>
+</div>
+
 
 <!-- SIDEBAR -->
 <div class="sidebar">
@@ -193,6 +208,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 
   <div class="sb-footer">
     <div id="save-indicator"></div>
+    <div style="font-size:9px;color:#6a9fc8;text-align:center;margin-bottom:5px">
+      <span id="auth-user"></span> &middot; <a href="#" onclick="doLogout();return false" style="color:#8fb4d8">Salir</a>
+    </div>
     <div style="display:flex;gap:5px;margin-bottom:5px">
       <button onclick="exportData()" style="flex:1;background:#243048;border:1px solid #4a6080;border-radius:5px;padding:5px;font-size:10px;color:#6a9fc8;cursor:pointer">⬇ Exportar</button>
       <button onclick="document.getElementById('import-inp').click()" style="flex:1;background:#243048;border:1px solid #4a6080;border-radius:5px;padding:5px;font-size:10px;color:#6a9fc8;cursor:pointer">⬆ Importar</button>
@@ -208,10 +226,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
     <span class="tb-title" id="tb-nombre">Obra</span>
     <span class="tb-sub" id="tb-dates"></span>
     <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
-      <button class="btn-sm btn-blue" onclick="document.getElementById('pdf-inp').click()">📄 Prog. Seguridad</button>
-      <input type="file" id="pdf-inp" accept="application/pdf" style="display:none" onchange="handlePDF(this)">
-      <button class="btn-sm" style="background:#c0392b;color:#fff" onclick="document.getElementById('plan-inp').click()">📐 Plan de trabajo</button>
-      <input type="file" id="plan-inp" accept="application/pdf" style="display:none" onchange="handlePlanPDF(this)">
+      <button class="btn-sm btn-blue" id="btn-ps" onclick="openDocFijo('ps')">📄 Prog. Seguridad</button>
+      <button class="btn-sm" style="background:#c0392b;color:#fff" id="btn-plan" onclick="openDocFijo('plan')">📐 Plan de trabajo</button>
       <button class="btn-sm btn-green" onclick="openInspModal(null)">Inspección HyS</button>
       <button class="btn-sm" style="background:#856404;color:#fff" onclick="openImportJSON()">📋 Pegar análisis</button>
     </div>
@@ -466,6 +482,27 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 </div>
 
 <!-- DOCUMENTOS MODAL -->
+<div class="modal-bg" id="docfijo-modal">
+  <div class="modal" style="width:520px">
+    <div class="mhd">
+      <div><h3 id="df-title">Documento</h3><div class="mhd-sub" id="df-sub"></div></div>
+      <button class="mx" onclick="closeDocFijo()">x</button>
+    </div>
+    <div class="mbody">
+      <div id="df-actual"></div>
+      <div style="background:#f7f8fa;border:1px solid #e8eaf0;border-radius:8px;padding:12px;margin-top:14px">
+        <div style="font-size:11px;font-weight:700;color:#1a2332;margin-bottom:8px" id="df-uplabel">Cargar archivo</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="file" id="df-file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="font-size:11px;flex:1">
+          <button onclick="subirDocFijo()" style="background:#1a4fa0;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer">Subir</button>
+        </div>
+        <div id="df-status" style="font-size:11px;margin-top:5px;font-weight:600"></div>
+      </div>
+    </div>
+    <div class="mfoot"><button class="btn-cancel" onclick="closeDocFijo()">Cerrar</button></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="docs-modal">
   <div class="modal" style="width:560px;max-height:88vh">
     <div class="mhd">
@@ -496,6 +533,69 @@ const OBRA_ID='obra_foresta_pellegrini'; // Foresta Pellegrini
 // -- SUPABASE --
 const SB_URL='https://aqbctspklwtbrjcwgdsl.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxYmN0c3BrbHd0YnJqY3dnZHNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTMzMDksImV4cCI6MjA5ODA2OTMwOX0.EJYaNnj-48vfDsja4n3qTojhByPONDUpMt97pZwtzZw';
+
+// ── AUTENTICACIÓN ──
+let SB_TOKEN=null, _refreshTimer=null;
+
+function hdrs(extra){
+  const h={'apikey':SB_KEY,'Authorization':'Bearer '+(SB_TOKEN||SB_KEY)};
+  return Object.assign(h, extra||{});
+}
+function jhdrs(extra){ return hdrs(Object.assign({'Content-Type':'application/json'}, extra||{})); }
+
+function _authStore(d){
+  SB_TOKEN=d.access_token;
+  localStorage.setItem('hs_refresh', d.refresh_token);
+  localStorage.setItem('hs_email', (d.user&&d.user.email)||'');
+  const el=document.getElementById('auth-user');
+  if(el) el.textContent=(d.user&&d.user.email)||localStorage.getItem('hs_email')||'';
+  if(_refreshTimer) clearTimeout(_refreshTimer);
+  const ms=Math.max(60,(d.expires_in||3600)-300)*1000;
+  _refreshTimer=setTimeout(refreshToken, ms);
+}
+
+async function doLogin(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-pass').value;
+  const err=document.getElementById('auth-err');
+  const btn=document.getElementById('auth-btn');
+  err.textContent=''; btn.disabled=true; btn.textContent='Ingresando...';
+  try{
+    const r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{
+      method:'POST', headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({email:email,password:pass})
+    });
+    const d=await r.json();
+    if(!d.access_token) throw new Error(d.error_description||d.msg||'Credenciales inválidas');
+    _authStore(d);
+    document.getElementById('auth-gate').style.display='none';
+    await bootApp();
+  }catch(e){ err.textContent=e.message; }
+  finally{ btn.disabled=false; btn.textContent='Ingresar'; }
+}
+
+async function refreshToken(){
+  const rt=localStorage.getItem('hs_refresh');
+  if(!rt) return false;
+  try{
+    const r=await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST', headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({refresh_token:rt})
+    });
+    const d=await r.json();
+    if(!d.access_token) throw new Error('refresh');
+    _authStore(d);
+    return true;
+  }catch(e){ localStorage.removeItem('hs_refresh'); return false; }
+}
+
+function doLogout(){
+  SB_TOKEN=null;
+  localStorage.removeItem('hs_refresh');
+  localStorage.removeItem('hs_email');
+  if(_refreshTimer) clearTimeout(_refreshTimer);
+  location.reload();
+}
 const LS_KEY='hs_'+OBRA_ID;
 let _saveTimer=null;
 
@@ -519,14 +619,14 @@ async function _saveSB(){
   try{
     const resp=await fetch(SB_URL+'/rest/v1/obras_data?id=eq.'+OBRA_ID,{
       method:'PATCH',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
+      headers:jhdrs({'Prefer':'return=minimal'}),
       body:JSON.stringify({data:obra,updated_at:new Date().toISOString()})
     });
     if(resp.status===404||resp.status===0){
       // Try insert
       await fetch(SB_URL+'/rest/v1/obras_data',{
         method:'POST',
-        headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
+        headers:jhdrs({'Prefer':'return=minimal'}),
         body:JSON.stringify({id:OBRA_ID,data:obra,updated_at:new Date().toISOString()})
       });
     }
@@ -536,7 +636,7 @@ async function _saveSB(){
 async function _loadSB(){
   try{
     const r=await fetch(SB_URL+'/rest/v1/obras_data?id=eq.'+OBRA_ID+'&select=data',{
-      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+      headers:hdrs()
     });
     const rows=await r.json();
     if(rows&&rows.length&&rows[0].data){
@@ -1009,27 +1109,119 @@ function guardarChk(){
 }
 document.getElementById('chk-modal').addEventListener('click',function(e){if(e.target===this)closeChk();});
 
-// -- FILE STORAGE --
-function handlePDF(input){
-  const file=input.files[0];if(!file)return;input.value='';
-  if(!obra.archivos)obra.archivos=[];
-  obra.archivos=obra.archivos.filter(f=>f.tipo!=='ps');
-  const r=new FileReader();
-  r.onload=e=>{obra.archivos.push({name:file.name,size:file.size,fecha:new Date().toLocaleDateString('es-AR'),tipo:'ps'});_saveData();showSaveOK('📄 Prog. de Seguridad guardado');};
-  r.readAsDataURL(file);
-  document.getElementById('ai-s').innerHTML='<div class="ai-bar done">OK '+file.name+' guardado. Subilo en el chat de Claude para analizarlo.</div>';
-  setTimeout(()=>{try{document.getElementById('ai-s').innerHTML='';}catch(e){}},5000);
+// -- DOCUMENTOS FIJOS (Prog. Seguridad / Plan de trabajo) --
+const DF_META = {
+  ps:   { titulo:'📄 Programa de Seguridad', carpeta:'_prog_seguridad', sub:'Documento vigente de la obra' },
+  plan: { titulo:'📐 Plan de trabajo',       carpeta:'_plan_trabajo',   sub:'Plan de arquitectura vigente' }
+};
+var currentDF = null;
+
+function getDocFijo(tipo){
+  return (obra.archivos||[]).filter(function(f){ return f.tipo===tipo; })[0] || null;
 }
 
-function handlePlanPDF(input){
-  const file=input.files[0];if(!file)return;input.value='';
-  if(!obra.archivos)obra.archivos=[];
-  obra.archivos=obra.archivos.filter(f=>f.tipo!=='plan');
-  const r=new FileReader();
-  r.onload=e=>{obra.archivos.push({name:file.name,size:file.size,fecha:new Date().toLocaleDateString('es-AR'),tipo:'plan'});_saveData();showSaveOK('📐 Plan de trabajo guardado');};
-  r.readAsDataURL(file);
-  document.getElementById('ai-s').innerHTML='<div class="ai-bar done">OK '+file.name+' guardado. Subilo en el chat de Claude para analizarlo.</div>';
-  setTimeout(()=>{try{document.getElementById('ai-s').innerHTML='';}catch(e){}},5000);
+function openDocFijo(tipo){
+  currentDF = tipo;
+  document.getElementById('df-title').textContent = DF_META[tipo].titulo;
+  document.getElementById('df-sub').textContent   = DF_META[tipo].sub;
+  document.getElementById('df-status').textContent = '';
+  document.getElementById('df-file').value = '';
+  renderDocFijo();
+  document.getElementById('docfijo-modal').classList.add('open');
+}
+function closeDocFijo(){
+  document.getElementById('docfijo-modal').classList.remove('open');
+}
+
+function renderDocFijo(){
+  var f = getDocFijo(currentDF);
+  var wrap = document.getElementById('df-actual');
+  var up   = document.getElementById('df-uplabel');
+  if(!f){
+    wrap.innerHTML = '<div style="font-size:11px;color:#bbb;padding:10px 0;text-align:center">No hay documento cargado para esta obra.</div>';
+    up.textContent = 'Cargar archivo';
+    return;
+  }
+  up.textContent = 'Reemplazar archivo';
+  var legacy = !f.path;
+  wrap.innerHTML = '<div style="display:flex;align-items:center;gap:10px;border:1px solid #e8eaf0;border-radius:8px;padding:12px">'
+    + '<span style="font-size:26px">📄</span>'
+    + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:12px;font-weight:700;color:#1a2332;overflow:hidden;text-overflow:ellipsis">' + f.name + '</div>'
+      + '<div style="font-size:9px;color:#888">Cargado el ' + (f.fecha||'-') + (f.size?' &middot; '+Math.round(f.size/1024)+' KB':'') + '</div>'
+      + (legacy?'<div style="font-size:9px;color:#c0392b;margin-top:3px">Registro antiguo sin archivo adjunto. Volvé a subirlo.</div>':'')
+    + '</div>'
+    + (legacy?'':'<button onclick="verDocFijo()" style="font-size:10px;color:#1a4fa0;background:#fff;padding:5px 10px;border:1px solid #1a4fa0;border-radius:4px;cursor:pointer">Ver</button>')
+    + '<button onclick="eliminarDocFijo()" style="background:#fde8e8;color:#c0392b;border:none;border-radius:4px;padding:5px 9px;font-size:10px;cursor:pointer">x</button>'
+    + '</div>';
+}
+
+function verDocFijo(){
+  var f = getDocFijo(currentDF);
+  if(!f || !f.path) return;
+  var w = window.open('', '_blank');
+  fetch(SB_STORAGE_URL + '/object/sign/' + BUCKET + '/' + f.path, {
+    method:'POST', headers: jhdrs(), body: JSON.stringify({ expiresIn: 3600 })
+  }).then(function(r){ return r.json(); })
+  .then(function(d){
+    if(!d.signedURL) throw new Error(d.message||'No se pudo firmar');
+    w.location.href = SB_STORAGE_URL + d.signedURL;
+  }).catch(function(e){
+    if(w) w.close();
+    alert('No se pudo abrir el documento: ' + e.message);
+  });
+}
+
+function subirDocFijo(){
+  var input = document.getElementById('df-file');
+  var file = input.files[0];
+  var st = document.getElementById('df-status');
+  if(!file){ st.textContent='Elegí un archivo primero.'; st.style.color='#c0392b'; return; }
+  st.textContent='Subiendo...'; st.style.color='#856404';
+
+  var prev = getDocFijo(currentDF);
+  var tipo = currentDF;
+  var path = OBRA_ID + '/' + DF_META[tipo].carpeta + '/' + Date.now() + '_' + file.name.replace(/\s/g,'_');
+
+  fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + path, {
+    method:'POST', headers: hdrs({ 'Content-Type': file.type, 'x-upsert':'true' }), body: file
+  }).then(function(r){
+    if(!r.ok) throw new Error('No se pudo subir el archivo');
+    if(prev && prev.path){
+      fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + prev.path, { method:'DELETE', headers: hdrs() });
+    }
+    if(!obra.archivos) obra.archivos=[];
+    obra.archivos = obra.archivos.filter(function(f){ return f.tipo!==tipo; });
+    obra.archivos.push({
+      name:file.name, size:file.size, path:path, type:file.type,
+      fecha:new Date().toLocaleDateString('es-AR'), tipo:tipo
+    });
+    _saveData();
+    input.value='';
+    st.textContent='Archivo cargado.'; st.style.color='#1a6b2e';
+    renderDocFijo(); renderDFBadges();
+    setTimeout(function(){ st.textContent=''; },3000);
+  }).catch(function(e){
+    st.textContent='Error: '+e.message; st.style.color='#c0392b';
+  });
+}
+
+function eliminarDocFijo(){
+  if(!confirm('Eliminar este documento?')) return;
+  var f = getDocFijo(currentDF);
+  if(f && f.path){
+    fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + f.path, { method:'DELETE', headers: hdrs() });
+  }
+  obra.archivos = (obra.archivos||[]).filter(function(x){ return x.tipo!==currentDF; });
+  _saveData();
+  renderDocFijo(); renderDFBadges();
+}
+
+function renderDFBadges(){
+  [['ps','btn-ps','📄 Prog. Seguridad'],['plan','btn-plan','📐 Plan de trabajo']].forEach(function(t){
+    var b=document.getElementById(t[1]); if(!b) return;
+    b.textContent = t[2] + (getDocFijo(t[0]) ? ' ✓' : ' +');
+  });
 }
 
 // -- EXPORT / IMPORT --
@@ -1650,10 +1842,28 @@ function renderDocsList() {
       + '<div style="font-size:11px;font-weight:600;color:#1a2332">' + doc.name + '</div>'
       + '<div style="font-size:9px;color:#888">' + (doc.fecha || '') + '</div>'
       + '</div>'
-      + '<a href="' + doc.url + '" target="_blank" style="font-size:10px;color:#1a4fa0;text-decoration:none;padding:3px 8px;border:1px solid #1a4fa0;border-radius:4px">Ver</a>'
+      + '<button onclick="verDoc(' + i + ')" style="font-size:10px;color:#1a4fa0;background:#fff;text-decoration:none;padding:3px 8px;border:1px solid #1a4fa0;border-radius:4px;cursor:pointer">Ver</button>'
       + '<button onclick="eliminarDoc(' + i + ')" style="background:#fde8e8;color:#c0392b;border:none;border-radius:4px;padding:3px 8px;font-size:10px;cursor:pointer">x</button>'
       + '</div>';
   }).join('');
+}
+
+function verDoc(i) {
+  var docs = (obra.docs || {})[currentDocsWk] || [];
+  var doc = docs[i];
+  if (!doc) return;
+  if (!doc.path) { if (doc.url) window.open(doc.url, '_blank'); return; }
+  var w = window.open('', '_blank');
+  fetch(SB_STORAGE_URL + '/object/sign/' + BUCKET + '/' + doc.path, {
+    method: 'POST', headers: jhdrs(), body: JSON.stringify({ expiresIn: 3600 })
+  }).then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.signedURL) throw new Error(d.message || 'No se pudo firmar');
+    w.location.href = SB_STORAGE_URL + d.signedURL;
+  }).catch(function(e){
+    if (w) w.close();
+    alert('No se pudo abrir el documento: ' + e.message);
+  });
 }
 
 function eliminarDoc(i) {
@@ -1664,7 +1874,7 @@ function eliminarDoc(i) {
   if (doc && doc.path) {
     fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + doc.path, {
       method: 'DELETE',
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+      headers: hdrs()
     });
   }
   docs.splice(i, 1);
@@ -1687,23 +1897,14 @@ function subirDoc() {
     var path = OBRA_ID + '/' + currentDocsWk + '/' + Date.now() + '_' + file.name.replace(/\s/g, '_');
     return fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + path, {
       method: 'POST',
-      headers: {
-        'apikey': SB_KEY,
-        'Authorization': 'Bearer ' + SB_KEY,
-        'Content-Type': file.type,
-        'x-upsert': 'true'
-      },
+      headers: hdrs({ 'Content-Type': file.type, 'x-upsert': 'true' }),
       body: file
     }).then(function(r) {
       if (!r.ok) throw new Error('Error subiendo ' + file.name);
       // Get public URL via signed URL (1 year)
       return fetch(SB_STORAGE_URL + '/object/sign/' + BUCKET + '/' + path, {
         method: 'POST',
-        headers: {
-          'apikey': SB_KEY,
-          'Authorization': 'Bearer ' + SB_KEY,
-          'Content-Type': 'application/json'
-        },
+        headers: jhdrs(),
         body: JSON.stringify({ expiresIn: 31536000 })
       });
     }).then(function(r) { return r.json(); })
@@ -1737,16 +1938,33 @@ function subirDoc() {
 }
 
 document.getElementById('docs-modal').addEventListener('click', function(e) { if (e.target === this) closeDocsModal(); });
+document.getElementById('docfijo-modal').addEventListener('click', function(e) { if (e.target === this) closeDocFijo(); });
 
 // -- INIT --
-(async()=>{
+let _booted=false;
+async function bootApp(){
+  if(_booted) return;
+  _booted=true;
   loadLocal();
   const ind=document.getElementById('save-indicator');
   ind.textContent='* Cargando...';ind.style.opacity='1';
   await _loadSB();
   ind.style.opacity='0';
+  const au=document.getElementById('auth-user');
+  if(au) au.textContent=localStorage.getItem('hs_email')||'';
   renderSB();
   renderTL();
+  renderDFBadges();
+}
+
+(async()=>{
+  const ok=await refreshToken();
+  if(ok){
+    document.getElementById('auth-gate').style.display='none';
+    await bootApp();
+  }else{
+    document.getElementById('auth-email').focus();
+  }
 })();
 </script>
 </body>

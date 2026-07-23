@@ -96,6 +96,21 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f7;color:#1a2332;mi
 </style>
 </head>
 <body>
+<div id="auth-gate" style="position:fixed;inset:0;background:#1a2332;z-index:9999;display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:10px;padding:28px 26px;width:300px;box-shadow:0 8px 32px rgba(0,0,0,.4)">
+    <div style="font-size:15px;font-weight:700;color:#1a2332;margin-bottom:2px">Sistema HyS</div>
+    <div style="font-size:11px;color:#888;margin-bottom:18px">Yingo S.A. &mdash; acceso restringido</div>
+    <input id="auth-email" type="email" placeholder="Email" autocomplete="username"
+      style="width:100%;box-sizing:border-box;padding:9px;margin-bottom:8px;border:1px solid #d5dbe4;border-radius:5px;font-size:12px">
+    <input id="auth-pass" type="password" placeholder="Contrase&ntilde;a" autocomplete="current-password"
+      style="width:100%;box-sizing:border-box;padding:9px;margin-bottom:12px;border:1px solid #d5dbe4;border-radius:5px;font-size:12px"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()" id="auth-btn"
+      style="width:100%;background:#1a4fa0;color:#fff;border:none;border-radius:5px;padding:10px;font-size:12px;font-weight:600;cursor:pointer">Ingresar</button>
+    <div id="auth-err" style="font-size:10px;color:#c0392b;margin-top:9px;min-height:13px"></div>
+  </div>
+</div>
+
 
 <div class="nav">
   <div class="nav-logo">Sistema HyS <span>Control General</span></div>
@@ -106,6 +121,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f7;color:#1a2332;mi
   <div class="nav-right">
     <span class="sync-ind" id="sync-ind">—</span>
     <button class="sync-btn" onclick="syncAll()">↻ Actualizar</button>
+    <span style="font-size:10px;color:#8fb4d8;margin-left:8px"><span id="auth-user"></span>
+      <a href="#" onclick="doLogout();return false" style="color:#8fb4d8;margin-left:5px">Salir</a></span>
   </div>
 </div>
 
@@ -183,6 +200,69 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f7;color:#1a2332;mi
 const SB_URL='https://aqbctspklwtbrjcwgdsl.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxYmN0c3BrbHd0YnJqY3dnZHNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTMzMDksImV4cCI6MjA5ODA2OTMwOX0.EJYaNnj-48vfDsja4n3qTojhByPONDUpMt97pZwtzZw';
 
+// ── AUTENTICACIÓN ──
+let SB_TOKEN=null, _refreshTimer=null;
+
+function hdrs(extra){
+  const h={'apikey':SB_KEY,'Authorization':'Bearer '+(SB_TOKEN||SB_KEY)};
+  return Object.assign(h, extra||{});
+}
+function jhdrs(extra){ return hdrs(Object.assign({'Content-Type':'application/json'}, extra||{})); }
+
+function _authStore(d){
+  SB_TOKEN=d.access_token;
+  localStorage.setItem('hs_refresh', d.refresh_token);
+  localStorage.setItem('hs_email', (d.user&&d.user.email)||'');
+  const el=document.getElementById('auth-user');
+  if(el) el.textContent=(d.user&&d.user.email)||localStorage.getItem('hs_email')||'';
+  if(_refreshTimer) clearTimeout(_refreshTimer);
+  const ms=Math.max(60,(d.expires_in||3600)-300)*1000;
+  _refreshTimer=setTimeout(refreshToken, ms);
+}
+
+async function doLogin(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-pass').value;
+  const err=document.getElementById('auth-err');
+  const btn=document.getElementById('auth-btn');
+  err.textContent=''; btn.disabled=true; btn.textContent='Ingresando...';
+  try{
+    const r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{
+      method:'POST', headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({email:email,password:pass})
+    });
+    const d=await r.json();
+    if(!d.access_token) throw new Error(d.error_description||d.msg||'Credenciales inválidas');
+    _authStore(d);
+    document.getElementById('auth-gate').style.display='none';
+    await bootApp();
+  }catch(e){ err.textContent=e.message; }
+  finally{ btn.disabled=false; btn.textContent='Ingresar'; }
+}
+
+async function refreshToken(){
+  const rt=localStorage.getItem('hs_refresh');
+  if(!rt) return false;
+  try{
+    const r=await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST', headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({refresh_token:rt})
+    });
+    const d=await r.json();
+    if(!d.access_token) throw new Error('refresh');
+    _authStore(d);
+    return true;
+  }catch(e){ localStorage.removeItem('hs_refresh'); return false; }
+}
+
+function doLogout(){
+  SB_TOKEN=null;
+  localStorage.removeItem('hs_refresh');
+  localStorage.removeItem('hs_email');
+  if(_refreshTimer) clearTimeout(_refreshTimer);
+  location.reload();
+}
+
 const OBRAS_CONFIG = [
   {id:'obra_foresta_alvear',     nombre:'Foresta Alvear',     color:'#1a4fa0', file:'obra_foresta_alvear.html'},
   {id:'obra_foresta_pellegrini', nombre:'Foresta Pellegrini', color:'#1a6b2e', file:'obra_foresta_pellegrini.html'},
@@ -236,7 +316,7 @@ async function syncAll() {
   try {
     const resp = await fetch(
       SB_URL + '/rest/v1/obras_data?id=in.(' + ids.join(',') + ')&select=id,data,updated_at',
-      {headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY}}
+      {headers: hdrs()}
     );
     const rows = await resp.json();
     rows.forEach(row => {
@@ -605,7 +685,7 @@ let precios = {};
 async function loadPrecios(){
   try{
     const resp = await fetch(SB_URL+'/rest/v1/obras_data?id=eq.costos_precios&select=data',{
-      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+      headers:hdrs()
     });
     const rows = await resp.json();
     if(rows&&rows.length&&rows[0].data&&rows[0].data.precios){
@@ -800,7 +880,7 @@ async function guardarPrecios(){
   try{
     const resp=await fetch(SB_URL+'/rest/v1/obras_data?id=eq.costos_precios',{
       method:'PATCH',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
+      headers:jhdrs({'Prefer':'return=minimal'}),
       body:JSON.stringify({data:{precios},updated_at:new Date().toISOString()})
     });
     if(!resp.ok)throw new Error('HTTP '+resp.status);
@@ -1073,14 +1153,28 @@ function populateSelectors(){
 
 
 // ── INIT ──
-(async()=>{
+let _booted=false, _refreshInt=null;
+async function bootApp(){
+  if(_booted) return;
+  _booted=true;
+  const au=document.getElementById('auth-user');
+  if(au) au.textContent=localStorage.getItem('hs_email')||'';
   populateSelectors();
   await loadPrecios();
   renderPreciosObra();
   await syncAll();
-  // Auto-refresh every 30 seconds
+  _refreshInt=setInterval(syncAll, 30 * 1000);
+}
+
+(async()=>{
+  const ok=await refreshToken();
+  if(ok){
+    document.getElementById('auth-gate').style.display='none';
+    await bootApp();
+  }else{
+    document.getElementById('auth-email').focus();
+  }
 })();
-setInterval(syncAll, 30 * 1000);
 </script>
 </body>
 </html>
