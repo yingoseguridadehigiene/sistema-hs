@@ -1165,6 +1165,13 @@ function calcCostoObra(obraId, obra, mesKey){
   let costoEpp=0,costoRopa=0;
   const detalle=[];
 
+  const fp=key=>(p.servicios.find(s=>s.key===key)||{}).precio||0;
+
+  // Servicios MENSUALES (alquileres/abonos): se cobran una vez por mes,
+  // tomando la MAYOR cantidad relevada en alguna semana del mes.
+  // Servicios por CONSUMO (limpiezas, bidones): se suman semana a semana.
+  const maxMes={banio_u:0, agua_d:0, alarma:0, camaras:0, internet:0};
+
   Object.keys(obra.servicios||{}).forEach(wk=>{
     const[y,w]=wk.split('-W').map(Number);
     const jan4=new Date(y,0,4);
@@ -1173,13 +1180,24 @@ function calcCostoObra(obraId, obra, mesKey){
     const mk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     if(mk!==mesKey)return;
     const srv=obra.servicios[wk];
-    const fp=key=>(p.servicios.find(s=>s.key===key)||{}).precio||0;
-    if(srv.banio_u) srvMap['banio_u']+=srv.banio_u*fp('banio_u')/4.33;
+
+    // consumo: acumulativo
     if(srv.banio_l) srvMap['banio_limp']+=srv.banio_l*fp('banio_limp');
-    if(srv.agua_d)  srvMap['agua_d']+=srv.agua_d*fp('agua_d')/4.33;
     if(srv.agua_b)  srvMap['agua_b']+=srv.agua_b*fp('agua_b');
-    if(srv.alarma_e==='Activa') srvMap['alarma']+=fp('alarma')/4.33;
+
+    // mensuales: se guarda el máximo del mes
+    if(srv.banio_u) maxMes.banio_u=Math.max(maxMes.banio_u, srv.banio_u);
+    if(srv.agua_d)  maxMes.agua_d =Math.max(maxMes.agua_d,  srv.agua_d);
+    if(srv.alarma_e==='Activa')      maxMes.alarma  =1;
+    if(srv.camaras_e==='Activas')    maxMes.camaras =1;
+    if(srv.internet_e==='Activo')    maxMes.internet=1;
   });
+
+  srvMap['banio_u'] = maxMes.banio_u * fp('banio_u');
+  srvMap['agua_d']  = maxMes.agua_d  * fp('agua_d');
+  srvMap['alarma']  = maxMes.alarma  * fp('alarma');
+  srvMap['camaras'] = maxMes.camaras * fp('camaras');
+  srvMap['internet']= maxMes.internet* fp('internet');
 
   const srvTotal=Object.values(srvMap).reduce((a,b)=>a+b,0);
 
