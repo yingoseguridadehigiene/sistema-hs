@@ -1110,6 +1110,14 @@ function renderPreciosObra() {
   `;
 }
 
+function setPrecioSrv(obraId,mesKey,key,field,val){
+  const p=getPreciosObraMes(obraId,mesKey);
+  if(!p.servicios)p.servicios=[];
+  let item=p.servicios.find(x=>x.key===key);
+  if(!item){const def=ALL_SRV_ITEMS.find(s=>s.key===key);item={...(def||{key}),precio:0,proveedor:''};p.servicios.push(item);}
+  item[field]=val;
+  _marcarOvr(obraId,mesKey,'servicios',key);
+}
 function setPrecioRopa(obraId,mesKey,key,precio){
   const p=getPreciosObraMes(obraId,mesKey);
   if(!p.ropa)p.ropa=[];
