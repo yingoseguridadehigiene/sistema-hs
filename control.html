@@ -567,23 +567,25 @@ const DF_META = {
   plan: { titulo:'Plan de trabajo (Arq.)' }
 };
 
-function getDocFijo(obra, tipo){
-  return ((obra&&obra.archivos)||[]).filter(function(f){ return f.tipo===tipo; })[0] || null;
+function getDocsFijos(obra, tipo){
+  return ((obra&&obra.archivos)||[]).filter(function(f){ return f.tipo===tipo; });
 }
+function getDocFijo(obra, tipo){ return getDocsFijos(obra,tipo)[0] || null; }
 
 function celdaDoc(obraId, tipo){
-  const obra = obrasData[obraId];
-  const f = getDocFijo(obra, tipo);
-  if(!f) return '<span class="srv-tag srv-warn">Sin cargar</span>';
-  if(!f.path) return '<span class="srv-tag srv-nd">Registro sin archivo</span>';
-  return '<button onclick="verDocCtrl(\''+obraId+'\',\''+tipo+'\')" '
-    + 'style="font-size:10px;color:#1a4fa0;background:#fff;padding:4px 9px;border:1px solid #1a4fa0;border-radius:4px;cursor:pointer">Ver</button>'
-    + '<div style="font-size:9px;color:#888;margin-top:3px">' + f.name + '</div>'
-    + '<div style="font-size:9px;color:#aaa">' + (f.fecha||'') + '</div>';
+  var lista = getDocsFijos(obrasData[obraId], tipo);
+  if(!lista.length) return '<span class="srv-tag srv-warn">Sin cargar</span>';
+  return lista.map(function(f,i){
+    if(!f.path) return '<div style="font-size:9px;color:#c0392b;margin-bottom:3px">'+f.name+' (sin archivo)</div>';
+    return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+      + '<button onclick="verDocCtrl(\''+obraId+'\',\''+tipo+'\','+i+')" style="font-size:10px;color:#1a4fa0;background:#fff;padding:3px 8px;border:1px solid #1a4fa0;border-radius:4px;cursor:pointer;flex-shrink:0">Ver</button>'
+      + '<div style="min-width:0"><div style="font-size:9px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.name+'</div>'
+      + '<div style="font-size:8px;color:#aaa">'+(f.fecha||'')+'</div></div></div>';
+  }).join('');
 }
 
-function verDocCtrl(obraId, tipo){
-  const f = getDocFijo(obrasData[obraId], tipo);
+function verDocCtrl(obraId, tipo, idx){
+  const f = getDocsFijos(obrasData[obraId], tipo)[idx||0];
   if(!f || !f.path) return;
   const w = window.open('', '_blank');
   fetch(SB_STORAGE_URL + '/object/sign/' + BUCKET + '/' + f.path, {
@@ -841,6 +843,9 @@ async function loadPrecios(){
     const local = localStorage.getItem(CC_KEY);
     if(local) try{ precios = JSON.parse(local).precios||{}; }catch(e2){}
   }
+  migrarPreciosAOvr();
+  if(false){
+  }
 }
 let activeCostosView = 'precios';
 
@@ -882,12 +887,117 @@ function getPreciosObraMes(obraId, mesKey) {
   return p;
 }
 
-// Get price for a month — uses closest earlier month if current not set
+// ── PRECIOS: general para todas las obras + excepciones por obra ──
+const GENERAL_ID = '_general';
+const SECCIONES_PRECIO = ['servicios','ropa','epp'];
+
+function esMesKey(k){ return /^\d{4}-\d{2}$/.test(k); }
+
+// precios crudos de un id para el mes (o el mes anterior más cercano)
+function rawPreciosMes(id, mesKey){
+  if(!precios[id]) return null;
+  const av = Object.keys(precios[id]).filter(esMesKey).sort().filter(k => k <= mesKey);
+  if(!av.length) return null;
+  return precios[id][av[av.length-1]];
+}
+
+// valor general vigente de un ítem
+function valorGeneral(mesKey, sec, key){
+  const g = rawPreciosMes(GENERAL_ID, mesKey);
+  const it = g && (g[sec]||[]).find(x=>x.key===key);
+  return it ? (it.precio||0) : 0;
+}
+function provGeneral(mesKey, key){
+  const g = rawPreciosMes(GENERAL_ID, mesKey);
+  const it = g && (g.servicios||[]).find(x=>x.key===key);
+  return it ? (it.proveedor||'') : '';
+}
+
+// ¿esta obra tiene excepción propia para el ítem en ese mes?
+function tieneOvr(obraId, mesKey, sec, key){
+  if(obraId===GENERAL_ID) return false;
+  const o = rawPreciosMes(obraId, mesKey);
+  const it = o && (o[sec]||[]).find(x=>x.key===key);
+  return !!(it && it.ovr);
+}
+function itemOvr(obraId, mesKey, sec, key){
+  const o = rawPreciosMes(obraId, mesKey);
+  return o && (o[sec]||[]).find(x=>x.key===key) || null;
+}
+
+// Precio efectivo del mes: general + excepciones de la obra
 function getPreciosMes(obraId, mesKey) {
-  if (!precios[obraId]) return null;
-  const available = Object.keys(precios[obraId]).sort().filter(k => k <= mesKey);
-  if (!available.length) return null;
-  return precios[obraId][available[available.length-1]];
+  const gen = rawPreciosMes(GENERAL_ID, mesKey);
+  const own = obraId===GENERAL_ID ? null : rawPreciosMes(obraId, mesKey);
+  if(!gen && !own) return null;
+  const out = { _general:!!gen };
+  SECCIONES_PRECIO.forEach(sec=>{
+    const map = new Map();
+    ((gen&&gen[sec])||[]).forEach(it=> map.set(it.key, Object.assign({}, it, {ovr:false})));
+    ((own&&own[sec])||[]).forEach(it=>{
+      if(it.ovr) map.set(it.key, Object.assign({}, it, {ovr:true}));
+      else if(!map.has(it.key)) map.set(it.key, Object.assign({}, it, {ovr:false}));
+    });
+    out[sec] = Array.from(map.values());
+  });
+  return out;
+}
+
+// quita todas las excepciones de una obra para ese mes
+function quitarExcepciones(obraId, mesKey){
+  const o = precios[obraId] && precios[obraId][mesKey];
+  if(!o) { renderPreciosObra(); return; }
+  SECCIONES_PRECIO.forEach(sec=>{ (o[sec]||[]).forEach(it=>{ it.ovr=false; }); });
+  renderPreciosObra();
+}
+function quitarExcepcionItem(obraId, mesKey, sec, key){
+  const it = itemOvr(obraId, mesKey, sec, key);
+  if(it) it.ovr=false;
+  renderPreciosObra();
+}
+
+// copia los precios de una obra al listado general
+function copiarAGeneral(obraId, mesKey){
+  if(!confirm('¿Usar los precios de esta obra como precios generales para todas?\n\n'
+    +'Las obras que no tengan excepciones propias pasarán a usar estos valores.')) return;
+  const src = getPreciosMes(obraId, mesKey) || getPreciosObraMes(obraId, mesKey);
+  const gen = getPreciosObraMes(GENERAL_ID, mesKey);
+  SECCIONES_PRECIO.forEach(sec=>{
+    if(!gen[sec]) gen[sec]=[];
+    (src[sec]||[]).forEach(it=>{
+      const t = gen[sec].find(x=>x.key===it.key);
+      if(t){ t.precio=it.precio||0; if(it.proveedor!==undefined) t.proveedor=it.proveedor||''; }
+      else gen[sec].push(Object.assign({}, it, {ovr:false}));
+    });
+  });
+  document.getElementById('cc-precios-obra-sel').value=GENERAL_ID;
+  renderPreciosObra();
+}
+
+// marca de excepción al editar
+function _marcarOvr(obraId, mesKey, sec, key){
+  if(obraId===GENERAL_ID) return;
+  const p=getPreciosObraMes(obraId,mesKey);
+  if(!p[sec]) p[sec]=[];
+  let it=p[sec].find(x=>x.key===key);
+  if(it) it.ovr=true;
+}
+
+
+// Los precios cargados antes de existir el listado general se conservan
+// como excepciones de cada obra, para no alterar los números históricos.
+function migrarPreciosAOvr(){
+  Object.keys(precios||{}).forEach(function(id){
+    if(id===GENERAL_ID) return;
+    Object.keys(precios[id]||{}).filter(esMesKey).forEach(function(mes){
+      const m=precios[id][mes];
+      SECCIONES_PRECIO.forEach(function(sec){
+        (m[sec]||[]).forEach(function(it){
+          if(it.ovr===undefined) it.ovr = !!(it.precio||it.proveedor);
+        });
+      });
+    });
+  });
 }
 
 function setCostosView(v) {
@@ -905,12 +1015,23 @@ function renderPreciosObra() {
   const obraId = document.getElementById('cc-precios-obra-sel').value;
   const mesKey = document.getElementById('cc-precios-mes-sel').value;
   if (!obraId || !mesKey) return;
-  const cfg = OBRAS_CONFIG.find(o=>o.id===obraId);
+  const esGen = obraId===GENERAL_ID;
+  const cfg = esGen ? {nombre:'General — todas las obras', color:'#1a4fa0'} : OBRAS_CONFIG.find(o=>o.id===obraId);
+  if(!cfg) return;
   const p = getPreciosObraMes(obraId, mesKey);
+  const eff = getPreciosMes(obraId, mesKey) || p;
+  const _v = (sec,key)=>{ const it=(eff[sec]||[]).find(x=>x.key===key); return it?(it.precio||0):0; };
+  const _ovr = (sec,key)=> !esGen && tieneOvr(obraId,mesKey,sec,key);
+  const _cls = (sec,key)=> _ovr(sec,key)
+      ? 'border:1px solid #1a4fa0;background:#eef4fd;font-weight:700;color:#1a4fa0'
+      : 'border:1px solid #d0d4db;color:#666';
+  const _rev = (sec,key)=> _ovr(sec,key)
+      ? `<button onclick="quitarExcepcionItem('${obraId}','${mesKey}','${sec}','${key}')" title="Volver al precio general" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:12px;padding:0 3px">↩</button>`
+      : '';
   const mesLabel = new Date(mesKey+'-15').toLocaleDateString('es-AR',{month:'long',year:'numeric'});
 
   document.getElementById('cc-precios-content').innerHTML = `
-    <div style="background:#1a2332;border-radius:9px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px">
+    <div style="background:#1a2332;border-radius:9px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;${esGen?'display:none':''}">
       <div style="flex:1">
         <div style="font-size:11px;font-weight:700;color:#fff">💰 Presupuesto asignado — ${cfg.nombre}</div>
         <div style="font-size:10px;color:#8aa0bc;margin-top:2px">Monto total disponible para gastar en esta obra</div>
@@ -924,11 +1045,20 @@ function renderPreciosObra() {
           placeholder="0">
       </div>
     </div>
-    <div style="background:#fffbe6;border:1px solid #ffe58f;border-radius:7px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#856404">
-      Editando precios de <strong>${cfg.nombre}</strong> para <strong>${mesLabel}</strong>.
-      Al guardar, si ya existe un precio para este mes se actualiza; si no, se crea nuevo registro.
-      Los meses anteriores conservan sus precios originales.
-    </div>
+    ${esGen?`
+    <div style="background:#eef4fd;border:1px solid #b8cde8;border-radius:7px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#1a4fa0">
+      🌐 Estás editando los <strong>precios generales</strong> de <strong>${mesLabel}</strong>. Se aplican a
+      <strong>todas las obras</strong>, salvo las que tengan una excepción propia cargada.
+    </div>`:`
+    <div style="background:#fffbe6;border:1px solid #ffe58f;border-radius:7px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#856404;display:flex;align-items:center;gap:10px">
+      <div style="flex:1">
+        Editando <strong>${cfg.nombre}</strong> — <strong>${mesLabel}</strong>.
+        Los valores en gris vienen del <strong>listado general</strong>. Si modificás uno, queda como
+        excepción de esta obra (en azul) y podés volver atrás con ↩.
+      </div>
+      <button onclick="quitarExcepciones('${obraId}','${mesKey}')" style="background:#fff;border:1px solid #d9b64a;color:#856404;border-radius:5px;padding:5px 9px;font-size:10px;cursor:pointer;white-space:nowrap">Quitar excepciones</button>
+      <button onclick="copiarAGeneral('${obraId}','${mesKey}')" style="background:#fff;border:1px solid #b8cde8;color:#1a4fa0;border-radius:5px;padding:5px 9px;font-size:10px;cursor:pointer;white-space:nowrap">Usar como general</button>
+    </div>`}
     <div class="srv-table" style="margin-bottom:14px">
       <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6;font-size:12px;font-weight:700;color:${cfg.color}">🔧 Servicios — ${cfg.nombre} — ${mesLabel}</div>
       <table>
@@ -939,10 +1069,10 @@ function renderPreciosObra() {
           const isExt=si.key.startsWith('ext_');
           return `<tr style="${isExt?'background:#fef9f5':''}">
             <td style="font-size:11px${isExt?';padding-left:20px':''}">${si.label}</td>
-            <td>${!isExt?`<input type="text" value="${stored.proveedor||''}" placeholder="Proveedor..." onchange="setPrecioSrv('${obraId}','${mesKey}','${si.key}','proveedor',this.value)" style="width:100%;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px">`:'—'}</td>
-            <td><input type="number" min="0" step="0.01" value="${stored.precio||0}"
-              onchange="setPrecioSrv('${obraId}','${mesKey}','${si.key}','precio',parseFloat(this.value)||0)"
-              style="width:100px;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
+            <td>${!isExt?`<input type="text" value="${_ovr('servicios',si.key)?(stored.proveedor||''):provGeneral(mesKey,si.key)}" placeholder="Proveedor..." onchange="setPrecioSrv('${obraId}','${mesKey}','${si.key}','proveedor',this.value);renderPreciosObra()" style="width:100%;border-radius:5px;padding:4px 7px;font-size:11px;${_cls('servicios',si.key)}">`:'—'}</td>
+            <td style="white-space:nowrap"><input type="number" min="0" step="0.01" value="${_v('servicios',si.key)}"
+              onchange="setPrecioSrv('${obraId}','${mesKey}','${si.key}','precio',parseFloat(this.value)||0);renderPreciosObra()"
+              style="width:100px;border-radius:5px;padding:4px 7px;font-size:11px;${_cls('servicios',si.key)}">${_rev('servicios',si.key)}</td>
             <td style="color:#888;font-size:10px">${si.unidad}</td>
           </tr>`;
         }).join('')}</tbody>
@@ -954,26 +1084,10 @@ function renderPreciosObra() {
         <thead><tr><th>Ítem</th><th>Precio unit.</th></tr></thead>
         <tbody>${p.ropa.map((r,i)=>`<tr>
           <td style="font-size:11px">${r.label}</td>
-          <td><input type="number" min="0" step="0.01" value="${r.precio||0}" onchange="precios['${obraId}']['${mesKey}'].ropa[${i}].precio=parseFloat(this.value)||0" style="width:100px;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
+          <td style="white-space:nowrap"><input type="number" min="0" step="0.01" value="${_v('ropa',r.key)}"
+            onchange="setPrecioRopa('${obraId}','${mesKey}','${r.key}',parseFloat(this.value)||0);renderPreciosObra()"
+            style="width:100px;border-radius:5px;padding:4px 7px;font-size:11px;${_cls('ropa',r.key)}">${_rev('ropa',r.key)}</td>
         </tr>`).join('')}</tbody>
-      </table>
-    </div>
-    <div class="srv-table" style="margin-bottom:14px">
-      <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6">
-        <span style="font-size:12px;font-weight:700;color:${cfg.color}">🧯 Extintores — ${cfg.nombre}</span>
-      </div>
-      <table>
-        <thead><tr><th>Ítem</th><th>Precio unit.</th><th>Unidad</th></tr></thead>
-        <tbody>${EXT_ITEMS.map((e,i)=>{
-          const stored=(p.ext||[]).find(x=>x.key===e.key)||{precio:0};
-          return `<tr>
-            <td style="font-size:11px">${e.label}</td>
-            <td><input type="number" min="0" step="0.01" value="${stored.precio||0}"
-              onchange="setPrecioExt('${obraId}','${mesKey}','${e.key}',parseFloat(this.value)||0)"
-              style="width:100px;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
-            <td style="color:#888;font-size:10px">${e.unidad}</td>
-          </tr>`;
-        }).join('')}</tbody>
       </table>
     </div>
     <div class="srv-table">
@@ -986,9 +1100,9 @@ function renderPreciosObra() {
           const stored = p.epp.find(x=>x.key===e.key)||{precio:0};
           return `<tr>
             <td style="font-size:11px">${e.label}</td>
-            <td><input type="number" min="0" step="0.01" value="${stored.precio||0}"
-              onchange="setPrecioEpp('${obraId}','${mesKey}','${e.key}',parseFloat(this.value)||0)"
-              style="width:100px;border:1px solid #d0d4db;border-radius:5px;padding:4px 7px;font-size:11px"></td>
+            <td style="white-space:nowrap"><input type="number" min="0" step="0.01" value="${_v('epp',e.key)}"
+              onchange="setPrecioEpp('${obraId}','${mesKey}','${e.key}',parseFloat(this.value)||0);renderPreciosObra()"
+              style="width:100px;border-radius:5px;padding:4px 7px;font-size:11px;${_cls('epp',e.key)}">${_rev('epp',e.key)}</td>
           </tr>`;
         }).join('')}</tbody>
       </table>
@@ -996,18 +1110,13 @@ function renderPreciosObra() {
   `;
 }
 
-function setPrecioExt(obraId,mesKey,key,precio){
+function setPrecioRopa(obraId,mesKey,key,precio){
   const p=getPreciosObraMes(obraId,mesKey);
-  if(!p.ext)p.ext=EXT_ITEMS.map(i=>({...i,precio:0}));
-  const item=p.ext.find(x=>x.key===key);
+  if(!p.ropa)p.ropa=[];
+  let item=p.ropa.find(x=>x.key===key);
   if(item)item.precio=precio;
-  else{const def=EXT_ITEMS.find(e=>e.key===key);if(def)p.ext.push({...def,precio});}
-}
-function setPrecioSrv(obraId,mesKey,key,field,val){
-  const p=getPreciosObraMes(obraId,mesKey);
-  let item=p.servicios.find(x=>x.key===key);
-  if(!item){const def=ALL_SRV_ITEMS.find(s=>s.key===key);item={...def,precio:0,proveedor:''};p.servicios.push(item);}
-  item[field]=val;
+  else{const def=ROPA_ITEMS.find(r=>r.key===key);if(def){item={...def,precio};p.ropa.push(item);}}
+  _marcarOvr(obraId,mesKey,'ropa',key);
 }
 function setPrecioEpp(obraId,mesKey,key,precio){
   const p=getPreciosObraMes(obraId,mesKey);
@@ -1017,6 +1126,7 @@ function setPrecioEpp(obraId,mesKey,key,precio){
     const def=EPP_DEFAULT.find(e=>e.key===key);
     if(def) p.epp.push({...def,precio});
   }
+  _marcarOvr(obraId,mesKey,'epp',key);
 }
 
 async function guardarPrecios(){
@@ -1283,6 +1393,8 @@ function renderComparar(){
 function populateSelectors(){
   const obraOpts=OBRAS_CONFIG.map(o=>`<option value="${o.id}">${o.nombre}</option>`).join('');
   ['cc-precios-obra-sel','cc-obra-sel'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=obraOpts;});
+  const selG=document.getElementById('cc-precios-obra-sel');
+  if(selG) selG.innerHTML='<option value="_general">🌐 General — todas las obras</option>'+obraOpts;
   const now=new Date();
   const months=[];
   for(let i=-6;i<=6;i++){
