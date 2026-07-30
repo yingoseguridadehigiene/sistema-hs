@@ -130,6 +130,21 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 </style>
 </head>
 <body>
+<div id="auth-gate" style="position:fixed;inset:0;background:#1a2332;z-index:9999;display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:10px;padding:28px 26px;width:300px;box-shadow:0 8px 32px rgba(0,0,0,.4)">
+    <div style="font-size:15px;font-weight:700;color:#1a2332;margin-bottom:2px">Sistema HyS</div>
+    <div style="font-size:11px;color:#888;margin-bottom:18px">Yingo S.A. &mdash; acceso restringido</div>
+    <input id="auth-email" type="email" placeholder="Email" autocomplete="username"
+      style="width:100%;box-sizing:border-box;padding:9px;margin-bottom:8px;border:1px solid #d5dbe4;border-radius:5px;font-size:12px">
+    <input id="auth-pass" type="password" placeholder="Contrase&ntilde;a" autocomplete="current-password"
+      style="width:100%;box-sizing:border-box;padding:9px;margin-bottom:12px;border:1px solid #d5dbe4;border-radius:5px;font-size:12px"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()" id="auth-btn"
+      style="width:100%;background:#1a4fa0;color:#fff;border:none;border-radius:5px;padding:10px;font-size:12px;font-weight:600;cursor:pointer">Ingresar</button>
+    <div id="auth-err" style="font-size:10px;color:#c0392b;margin-top:9px;min-height:13px"></div>
+  </div>
+</div>
+
 
 <!-- SIDEBAR -->
 <div class="sidebar">
@@ -193,6 +208,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 
   <div class="sb-footer">
     <div id="save-indicator"></div>
+    <div style="font-size:9px;color:#6a9fc8;text-align:center;margin-bottom:5px">
+      <span id="auth-user"></span> &middot; <a href="#" onclick="doLogout();return false" style="color:#8fb4d8">Salir</a>
+    </div>
     <div style="display:flex;gap:5px;margin-bottom:5px">
       <button onclick="exportData()" style="flex:1;background:#243048;border:1px solid #4a6080;border-radius:5px;padding:5px;font-size:10px;color:#6a9fc8;cursor:pointer">⬇ Exportar</button>
       <button onclick="document.getElementById('import-inp').click()" style="flex:1;background:#243048;border:1px solid #4a6080;border-radius:5px;padding:5px;font-size:10px;color:#6a9fc8;cursor:pointer">⬆ Importar</button>
@@ -208,10 +226,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
     <span class="tb-title" id="tb-nombre">Obra</span>
     <span class="tb-sub" id="tb-dates"></span>
     <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
-      <button class="btn-sm btn-blue" onclick="document.getElementById('pdf-inp').click()">📄 Prog. Seguridad</button>
-      <input type="file" id="pdf-inp" accept="application/pdf" style="display:none" onchange="handlePDF(this)">
-      <button class="btn-sm" style="background:#c0392b;color:#fff" onclick="document.getElementById('plan-inp').click()">📐 Plan de trabajo</button>
-      <input type="file" id="plan-inp" accept="application/pdf" style="display:none" onchange="handlePlanPDF(this)">
+      <button class="btn-sm btn-blue" id="btn-ps" onclick="openDocFijo('ps')">📄 Prog. Seguridad</button>
+      <button class="btn-sm" style="background:#c0392b;color:#fff" id="btn-plan" onclick="openDocFijo('plan')">📐 Plan de trabajo</button>
       <button class="btn-sm btn-green" onclick="openInspModal(null)">Inspección HyS</button>
       <button class="btn-sm" style="background:#856404;color:#fff" onclick="openImportJSON()">📋 Pegar análisis</button>
     </div>
@@ -323,26 +339,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 
 <!-- CHK MODAL -->
 <div class="modal-bg" id="chk-modal">
-  <div class="modal" style="width:720px;max-height:94vh">
-    <div class="mhd">
-      <div><h3 id="chk-title">Relevamiento semanal</h3><div class="mhd-sub" id="chk-sub"></div></div>
-      <button class="mx" onclick="closeChk()">x</button>
-    </div>
+  <div class="modal" style="width:680px;max-height:90vh">
+    <div class="mhd"><div><h3 id="chk-title">Relevamiento semanal</h3><div class="mhd-sub" id="chk-sub"></div></div><button class="mx" onclick="closeChk()">✕</button></div>
     <div class="mbody" id="chk-body"></div>
-    <div style="padding:10px 16px;border-top:1px solid #f0f2f6;background:#f9fafb">
-      <div style="font-size:11px;font-weight:700;color:#1a2332;margin-bottom:6px">Fotos del relevamiento</div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="file" id="chk-foto-input" multiple accept="image/*,.jpg,.jpeg,.png,.gif,.webp" style="font-size:11px;flex:1">
-        <button onclick="subirFotosChk()" style="background:#1a4fa0;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer">Subir fotos</button>
-      </div>
-      <div id="chk-fotos-preview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
-      <div id="chk-foto-status" style="font-size:10px;margin-top:4px"></div>
-    </div>
-    <div class="mfoot">
-      <button class="btn-cancel" onclick="closeChk()">Cancelar</button>
-      <button class="btn-save" onclick="guardarChk()">Guardar</button>
-      <button onclick="enviarInformeEmail()" style="background:#1a6b2e;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">Enviar informe por mail</button>
-    </div>
+    <div class="mfoot"><button class="btn-cancel" onclick="closeChk()">Cancelar</button><button class="btn-save" onclick="guardarChk()">Guardar relevamiento</button></div>
   </div>
 </div>
 
@@ -375,6 +375,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
   <div class="modal" style="width:680px;max-height:90vh">
     <div class="mhd">
       <div><h3>👷 Personal de obra</h3><div class="mhd-sub">Ropa de trabajo y EPP entregado</div></div>
+      <button class="btn-sm btn-gray" style="margin-right:8px" onclick="imprimirConstancia('all')">🖨 Constancias 299/11</button>
       <button class="mx" onclick="closePersonalModal()">✕</button>
     </div>
     <div class="mbody">
@@ -394,6 +395,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
     </div>
     <div class="mbody">
       <div class="field"><label>Apellido y nombre</label><input type="text" id="op-nombre" placeholder="Ej: Pérez Juan"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>DNI / CUIL</label><input type="text" id="op-dni" placeholder="Ej: 20-12345678-9"></div>
+        <div class="field"><label>Puesto / Sector</label><input type="text" id="op-puesto" placeholder="Ej: Oficial albañil"></div>
+      </div>
 
       <div class="cat-head" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center">
         <span>👕 Ropa de trabajo — historial de entregas</span>
@@ -413,6 +418,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
     </div>
     <div class="mfoot">
       <button class="btn-cancel" style="background:#fde8e8;color:#c0392b" id="op-del-btn" onclick="eliminarOperario()" style="display:none">🗑 Eliminar</button>
+      <button class="btn-cancel" style="background:#e8f0fb;color:#1a4fa0" id="op-print-btn" onclick="imprimirConstancia(editingOpIdx)">🖨 Constancia 299/11</button>
       <button class="btn-cancel" onclick="closeOperarioForm()">Cancelar</button>
       <button class="btn-save" onclick="guardarOperario()">Guardar</button>
     </div>
@@ -482,6 +488,27 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 </div>
 
 <!-- DOCUMENTOS MODAL -->
+<div class="modal-bg" id="docfijo-modal">
+  <div class="modal" style="width:520px">
+    <div class="mhd">
+      <div><h3 id="df-title">Documento</h3><div class="mhd-sub" id="df-sub"></div></div>
+      <button class="mx" onclick="closeDocFijo()">x</button>
+    </div>
+    <div class="mbody">
+      <div id="df-actual"></div>
+      <div style="background:#f7f8fa;border:1px solid #e8eaf0;border-radius:8px;padding:12px;margin-top:14px">
+        <div style="font-size:11px;font-weight:700;color:#1a2332;margin-bottom:8px" id="df-uplabel">Cargar archivo</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="file" id="df-file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="font-size:11px;flex:1">
+          <button onclick="subirDocFijo()" style="background:#1a4fa0;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer">Subir</button>
+        </div>
+        <div id="df-status" style="font-size:11px;margin-top:5px;font-weight:600"></div>
+      </div>
+    </div>
+    <div class="mfoot"><button class="btn-cancel" onclick="closeDocFijo()">Cerrar</button></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="docs-modal">
   <div class="modal" style="width:560px;max-height:88vh">
     <div class="mhd">
@@ -512,6 +539,69 @@ const OBRA_ID='obra_tortuguitas'; // C.C. Tortuguitas
 // -- SUPABASE --
 const SB_URL='https://aqbctspklwtbrjcwgdsl.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxYmN0c3BrbHd0YnJqY3dnZHNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTMzMDksImV4cCI6MjA5ODA2OTMwOX0.EJYaNnj-48vfDsja4n3qTojhByPONDUpMt97pZwtzZw';
+
+// ── AUTENTICACIÓN ──
+let SB_TOKEN=null, _refreshTimer=null;
+
+function hdrs(extra){
+  const h={'apikey':SB_KEY,'Authorization':'Bearer '+(SB_TOKEN||SB_KEY)};
+  return Object.assign(h, extra||{});
+}
+function jhdrs(extra){ return hdrs(Object.assign({'Content-Type':'application/json'}, extra||{})); }
+
+function _authStore(d){
+  SB_TOKEN=d.access_token;
+  localStorage.setItem('hs_refresh', d.refresh_token);
+  localStorage.setItem('hs_email', (d.user&&d.user.email)||'');
+  const el=document.getElementById('auth-user');
+  if(el) el.textContent=(d.user&&d.user.email)||localStorage.getItem('hs_email')||'';
+  if(_refreshTimer) clearTimeout(_refreshTimer);
+  const ms=Math.max(60,(d.expires_in||3600)-300)*1000;
+  _refreshTimer=setTimeout(refreshToken, ms);
+}
+
+async function doLogin(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-pass').value;
+  const err=document.getElementById('auth-err');
+  const btn=document.getElementById('auth-btn');
+  err.textContent=''; btn.disabled=true; btn.textContent='Ingresando...';
+  try{
+    const r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{
+      method:'POST', headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({email:email,password:pass})
+    });
+    const d=await r.json();
+    if(!d.access_token) throw new Error(d.error_description||d.msg||'Credenciales inválidas');
+    _authStore(d);
+    document.getElementById('auth-gate').style.display='none';
+    await bootApp();
+  }catch(e){ err.textContent=e.message; }
+  finally{ btn.disabled=false; btn.textContent='Ingresar'; }
+}
+
+async function refreshToken(){
+  const rt=localStorage.getItem('hs_refresh');
+  if(!rt) return false;
+  try{
+    const r=await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST', headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({refresh_token:rt})
+    });
+    const d=await r.json();
+    if(!d.access_token) throw new Error('refresh');
+    _authStore(d);
+    return true;
+  }catch(e){ localStorage.removeItem('hs_refresh'); return false; }
+}
+
+function doLogout(){
+  SB_TOKEN=null;
+  localStorage.removeItem('hs_refresh');
+  localStorage.removeItem('hs_email');
+  if(_refreshTimer) clearTimeout(_refreshTimer);
+  location.reload();
+}
 const LS_KEY='hs_'+OBRA_ID;
 let _saveTimer=null;
 
@@ -535,14 +625,14 @@ async function _saveSB(){
   try{
     const resp=await fetch(SB_URL+'/rest/v1/obras_data?id=eq.'+OBRA_ID,{
       method:'PATCH',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
+      headers:jhdrs({'Prefer':'return=minimal'}),
       body:JSON.stringify({data:obra,updated_at:new Date().toISOString()})
     });
     if(resp.status===404||resp.status===0){
       // Try insert
       await fetch(SB_URL+'/rest/v1/obras_data',{
         method:'POST',
-        headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
+        headers:jhdrs({'Prefer':'return=minimal'}),
         body:JSON.stringify({id:OBRA_ID,data:obra,updated_at:new Date().toISOString()})
       });
     }
@@ -552,7 +642,7 @@ async function _saveSB(){
 async function _loadSB(){
   try{
     const r=await fetch(SB_URL+'/rest/v1/obras_data?id=eq.'+OBRA_ID+'&select=data',{
-      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+      headers:hdrs()
     });
     const rows=await r.json();
     if(rows&&rows.length&&rows[0].data){
@@ -671,18 +761,44 @@ function renderSrvSB(){
   if(pEl)pEl.textContent=pCount+' operario'+(pCount===1?'':'s')+' cargado'+(pCount===1?'':'s');
 }
 
-function barRow(label,color,evArr,type){
+function barRow(label,color,evArr,type,opts){
+  opts=opts||{};
   const bars=evArr.map((ev,i)=>{
     const l=pct(ev.inicio),w=(ev.inicio===ev.fin||type==='cap'||type==='insp')?null:wPct(ev.inicio,ev.fin);
     const isPt=(ev.inicio===ev.fin)||type==='cap'||type==='insp';
-    const style=isPt?`left:${l}%`:`left:${l}%;width:${w}%`;
+    let style=isPt?`left:${l}%`:`left:${l}%;width:${w}%`;
+    if(opts.color) style+=`;background:${opts.color}`;
     const lbl=(!isPt&&w>8)?ev.desc.slice(0,22)+(ev.desc.length>22?'...':''):(type==='insp'?'':'');
-    return`<div class="gbar ${type}" style="${style}" title="${ev.desc}${ev.obs?'  -  '+ev.obs:''}" onclick="clickBar(${i},'${type}')">${lbl}</div>`;
+    const idx=opts.planKey!==undefined?`${i},'${type}','${(opts.planKey+'').replace(/'/g,"")}'`:`${i},'${type}'`;
+    return`<div class="gbar ${type}" style="${style}" title="${ev.desc}${ev.obs?'  -  '+ev.obs:''}" onclick="clickBar(${idx})">${lbl}</div>`;
   }).join('');
+  const rowId=opts.rowId||type;
   return`<div class="gantt-row">
-    <div class="grl"><div class="grl-dot" style="background:${color}"></div><div class="grl-txt">${label}</div></div>
-    <div class="gantt-row-bars">${bars}<div class="gantt-today" id="gt-${type}" style="display:none"></div></div>
+    <div class="grl"><div class="grl-dot" style="background:${color}"></div><div class="grl-txt">${label}</div>${opts.delPlan?`<button onclick="eliminarPlan('${(opts.delPlan+'').replace(/'/g,"")}')" title="Eliminar este plan de la línea de tiempo" style="background:none;border:none;color:#c0392b;font-size:13px;cursor:pointer;padding:0 2px;line-height:1">×</button>`:''}</div>
+    <div class="gantt-row-bars">${bars}<div class="gantt-today" id="gt-${rowId}" style="display:none"></div></div>
   </div>`;
+}
+
+// -- PLANES DE TRABAJO (uno o varios) --
+const PLAN_COLORES=['#c0392b','#0e7c86','#b8860b','#6a1b9a','#2e7d32','#c2185b','#455a64'];
+function planNombre(ev){ return ev.plan || 'Plan de trabajo (Arq.)'; }
+function eliminarPlan(nombre){
+  const evs=(obra.eventos||[]).filter(e=>e.type==='plan'&&planNombre(e)===nombre);
+  if(!evs.length)return;
+  if(!confirm('¿Eliminar el plan "'+nombre+'" de la línea de tiempo?\n\n'
+    +'Se borrarán '+evs.length+' etapas. Los archivos PDF cargados en la pastilla '
+    +'"Plan de trabajo" NO se borran: eso se hace por separado desde ahí.'))return;
+  obra.eventos=(obra.eventos||[]).filter(e=>!(e.type==='plan'&&planNombre(e)===nombre));
+  _saveData();showSaveOK();renderTL();
+}
+
+function planesDeObra(){
+  const evs=(obra.eventos||[]).filter(e=>e.type==='plan');
+  const map=new Map();
+  evs.forEach(e=>{ const k=planNombre(e); if(!map.has(k))map.set(k,[]); map.get(k).push(e); });
+  return Array.from(map.entries()).map(([nombre,eventos],i)=>({
+    nombre, eventos, color:PLAN_COLORES[i%PLAN_COLORES.length], key:'plan'+i
+  }));
 }
 
 function buildSrvEvs(){
@@ -699,6 +815,7 @@ function renderTL(){
   if(!obra.inicio||!obra.fin){document.getElementById('tl-wrap').innerHTML='<div style="padding:20px;color:#888;font-size:12px">Completá la información de la obra para ver la línea de tiempo.</div>';return;}
   const evs=obra.eventos||[];
   const planEvs=evs.filter(e=>e.type==='plan');
+  const planes=planesDeObra();
   const srvEvs=buildSrvEvs();
   const etapas=evs.filter(e=>e.type==='etapa');
   const caps=evs.filter(e=>e.type==='cap');
@@ -717,7 +834,7 @@ function renderTL(){
   <div class="tl-wrap">
     <div class="tl-head">
       <span class="tl-title">Línea de tiempo  -  ${obra.nombre||''}</span>
-      <div class="leg"><div class="leg-pill" style="background:#c0392b"></div>Plan Arq.</div>
+      ${planes.map(p=>`<div class="leg"><div class="leg-pill" style="background:${p.color}"></div>${p.nombre}</div>`).join('')}
 
       <div class="leg"><div class="leg-pill" style="background:#1a4fa0"></div>Etapas HyS</div>
       <div class="leg"><div class="leg-pill" style="background:#1a6b2e"></div>Capacitaciones</div>
@@ -726,7 +843,7 @@ function renderTL(){
     </div>
     <div class="gantt-table"><div class="gantt-inner">
       <div class="gantt-months" style="padding-left:160px">${mHead}</div>
-      ${planEvs.length?barRow('Plan de trabajo (Arq.)','#c0392b',planEvs,'plan'):''}
+      ${planes.map(p=>barRow(p.nombre,p.color,p.eventos,'plan',{color:p.color,planKey:p.nombre,rowId:p.key,delPlan:p.nombre})).join('')}
 
       ${barRow('Etapas constructivas','#1a4fa0',etapas,'etapa')}
       ${barRow('Capacitaciones','#1a6b2e',caps,'cap')}
@@ -751,13 +868,13 @@ function renderTL(){
 
 function setTodayLine(){
   const todayPct=pct(new Date().toISOString().slice(0,10));
-  ['plan','servicios','etapa','cap','insp'].forEach(t=>{
+  planesDeObra().map(p=>p.key).concat(['plan','servicios','etapa','cap','insp']).forEach(t=>{
     const el=document.getElementById('gt-'+t);
     if(el){el.style.display='block';el.style.left=todayPct+'%';}
   });
 }
 
-function clickBar(idx,type){
+function clickBar(idx,type,planKey){
   if(type==='insp'){
     // Find matching inspección by evento index
     const evs=(obra.eventos||[]).filter(e=>e.type==='insp');
@@ -773,8 +890,10 @@ function clickBar(idx,type){
       document.getElementById('insp-inspector').value=ev.inspector||'';
     }
   } else {
-    const evs=(obra.eventos||[]).filter(e=>e.type===type);
-    if(evs[idx])alert(evs[idx].desc+(evs[idx].obs?'\n'+evs[idx].obs:'')+'\n'+fmtD(evs[idx].inicio)+' -> '+fmtD(evs[idx].fin));
+    let evs=(obra.eventos||[]).filter(e=>e.type===type);
+    if(type==='plan'&&planKey) evs=evs.filter(e=>planNombre(e)===planKey);
+    const ev=evs[idx];
+    if(ev)alert((type==='plan'?planNombre(ev)+'\n\n':'')+ev.desc+(ev.obs?'\n'+ev.obs:'')+'\n'+fmtD(ev.inicio)+' -> '+fmtD(ev.fin));
   }
 }
 
@@ -956,13 +1075,13 @@ document.getElementById('ev-modal').addEventListener('click',function(e){if(e.ta
 const CATS=[
   {key:'docs_hys',label:'Documentación HyS',items:['Programa de Seguridad','Documentación Higiene y Seguridad','Capacitaciones','Planilla 299/11','Rol de emergencia para accidentes','Cartelería HyS']},
   {key:'docs_lab',label:'Documentación Laboral',items:['Seguro de Responsabilidad Civil','Seguro de Accidentes Personales','Documentación de subcontratos','Certificado de ART','Alta temprana de trabajadores','Constancia de inscripción AFIP']},
-  {key:'maq',label:'Maquinaria y Equipos',items:['Documentación de maquinarias','Check list máquinas','Cálculo andamios / montacargas','Elementos de izaje','Andamios','Operadores habilitados','Protecciones y guardas en su lugar','Check list de elementos de izaje','Armado de andamio']},
-  {key:'elec',label:'Instalación Eléctrica',items:['Tablero eléctrico','Puesta a tierra','Tendido eléctrico elevado','Correcta iluminación en zona de trabajo','Cables sin deterioro ni empalmes']},
-  {key:'epp',label:'EPP y Vestimenta',items:['Todos poseen ropa de trabajo','Uso de camisa de trabajo','Uso de botines de seguridad','Estado de ropa de los operarios','EPP para la realización de las tareas']},
+  {key:'maq',label:'Maquinaria y Equipos',items:['Documentación de maquinarias','Check list máquinas','Cálculo andamios / montacargas','Elementos de izaje','Andamios']},
+  {key:'elec',label:'Instalación Eléctrica',items:['Tablero eléctrico','Puesta a tierra','Tendido eléctrico elevado','Correcta iluminación en zona de trabajo']},
+  {key:'epp',label:'EPP y Vestimenta',items:['Todos poseen ropa de trabajo','Uso de camisa de trabajo','Uso de botines de seguridad','Estado de ropa de los operarios','EPP para la realización de las tareas','Uso de casco','Uso de guantes']},
   {key:'altura',label:'Trabajos en Altura',items:['Líneas de vida','Arnés','Cabo de vida','Barandas filo de losa','Barandas de escaleras','Protección de huecos / pase de losa','Escalera de acceso','Protección en pelos de hierro']},
-  {key:'orden',label:'Orden y Limpieza',items:['Orden y limpieza general','Acopio de madera','Acopio de hierros','Sector sucio','Espacio de trabajo despejado','Volquete','Delimitación de zona de trabajo','Barandas excavación','Residuos clasificados y retirados','Estado del obrador']},
-  {key:'servicios',label:'Servicios',items:['Botiquín de primeros auxilios','Extintores','Baños acorde a cantidad de operarios','Vestuario acorde a cantidad de operarios','Dispenser','Agua para consumo (bidones)','Baño químico limpio y funcional']},
-  {key:'perim',label:'Seguridad Perimetral',items:['Cámaras de seguridad','Luces de obra','Cerco de obra','Alarma','Barreras exteriores','Cartel de obra','Portones en buen estado','Cierre de portones (cadena + candado)','Iluminación perimetral nocturna','Señalización de accesos']}
+  {key:'orden',label:'Orden y Limpieza',items:['Orden y limpieza general','Acopio de madera','Acopio de hierros','Sector sucio','Espacio de trabajo despejado','Volquete','Delimitación de zona de trabajo','Barandas excavación']},
+  {key:'servicios',label:'Servicios',items:['Botiquín de primeros auxilios','Extintores','Baños acorde a cantidad de operarios','Vestuario acorde a cantidad de operarios','Dispenser','Agua para consumo (bidones)']},
+  {key:'perim',label:'Seguridad Perimetral',items:['Cámaras de seguridad','Luces de obra','Cerco de obra','Alarma','Barreras exteriores','Cartel de obra']}
 ];
 
 function mkRel(){return Object.fromEntries(CATS.map(c=>[c.key,{nr:false,obs:'',items:Object.fromEntries(c.items.map(it=>[it,{s:'nd',obs:''}]))}]));}
@@ -975,7 +1094,6 @@ function openChk(wk){
   document.getElementById('chk-title').textContent='Relevamiento semanal';
   document.getElementById('chk-sub').textContent='Semana '+wk;
   renderChkBody();
-  renderFotosChk();
   document.getElementById('chk-modal').classList.add('open');
 }
 function closeChk(){document.getElementById('chk-modal').classList.remove('open');}
@@ -1026,27 +1144,277 @@ function guardarChk(){
 }
 document.getElementById('chk-modal').addEventListener('click',function(e){if(e.target===this)closeChk();});
 
-// -- FILE STORAGE --
-function handlePDF(input){
-  const file=input.files[0];if(!file)return;input.value='';
-  if(!obra.archivos)obra.archivos=[];
-  obra.archivos=obra.archivos.filter(f=>f.tipo!=='ps');
-  const r=new FileReader();
-  r.onload=e=>{obra.archivos.push({name:file.name,size:file.size,fecha:new Date().toLocaleDateString('es-AR'),tipo:'ps'});_saveData();showSaveOK('📄 Prog. de Seguridad guardado');};
-  r.readAsDataURL(file);
-  document.getElementById('ai-s').innerHTML='<div class="ai-bar done">OK '+file.name+' guardado. Subilo en el chat de Claude para analizarlo.</div>';
-  setTimeout(()=>{try{document.getElementById('ai-s').innerHTML='';}catch(e){}},5000);
+
+// -- CONSTANCIA DE ENTREGA DE EPP - Res. SRT 299/11 --
+const EMPRESA_299 = {
+  razon: 'YINGO S.A.',
+  cuit: '30-71597457-2',
+  domicilio: 'Calle 9 N° 2093 - La Plata, Buenos Aires'
+};
+
+function _esc(t){
+  return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function _fechaAR(f){
+  if(!f) return '';
+  var p=String(f).split('-');
+  return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : f;
 }
 
-function handlePlanPDF(input){
-  const file=input.files[0];if(!file)return;input.value='';
-  if(!obra.archivos)obra.archivos=[];
-  obra.archivos=obra.archivos.filter(f=>f.tipo!=='plan');
-  const r=new FileReader();
-  r.onload=e=>{obra.archivos.push({name:file.name,size:file.size,fecha:new Date().toLocaleDateString('es-AR'),tipo:'plan'});_saveData();showSaveOK('📐 Plan de trabajo guardado');};
-  r.readAsDataURL(file);
-  document.getElementById('ai-s').innerHTML='<div class="ai-bar done">OK '+file.name+' guardado. Subilo en el chat de Claude para analizarlo.</div>';
-  setTimeout(()=>{try{document.getElementById('ai-s').innerHTML='';}catch(e){}},5000);
+function _filasConstancia(op){
+  var rows=[];
+  (op.ropa||[]).forEach(function(r){ rows.push({fecha:r.fecha,prod:r.item,cant:r.cant,clase:'Ropa de trabajo'}); });
+  (op.epp||[]).forEach(function(r){ rows.push({fecha:r.fecha,prod:r.item,cant:r.cant,clase:'EPP'}); });
+  rows.sort(function(a,b){ return String(a.fecha||'').localeCompare(String(b.fecha||'')); });
+  return rows;
+}
+
+function _hojaConstancia(op){
+  var filas=_filasConstancia(op);
+  var minFilas=16;
+  var cuerpo=filas.map(function(r){
+    return '<tr>'
+      + '<td class="c">'+_esc(_fechaAR(r.fecha))+'</td>'
+      + '<td>'+_esc(r.prod)+'</td>'
+      + '<td class="c">'+_esc(r.clase)+'</td>'
+      + '<td class="c">'+_esc(r.cant||'')+'</td>'
+      + '<td></td><td></td><td class="firma"></td>'
+      + '</tr>';
+  }).join('');
+  for(var i=filas.length;i<minFilas;i++){
+    cuerpo += '<tr><td class="c">&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td class="firma"></td></tr>';
+  }
+
+  return ''
+  + '<div class="hoja">'
+  + '  <div class="tit">CONSTANCIA DE ENTREGA DE ROPA DE TRABAJO Y<br>ELEMENTOS DE PROTECCI&Oacute;N PERSONAL</div>'
+  + '  <div class="sub">Resoluci&oacute;n S.R.T. N&deg; 299/2011 &mdash; Anexo &mdash; Ley 19.587 / Decreto 911/96</div>'
+  + '  <table class="datos">'
+  + '    <tr><td class="lb">Raz&oacute;n social</td><td>'+_esc(EMPRESA_299.razon)+'</td>'
+  +        '<td class="lb">C.U.I.T.</td><td>'+_esc(EMPRESA_299.cuit)+'</td></tr>'
+  + '    <tr><td class="lb">Domicilio</td><td colspan="3">'+_esc(EMPRESA_299.domicilio)+'</td></tr>'
+  + '    <tr><td class="lb">Obra / Establecimiento</td><td>'+_esc(obra.nombre||'')+'</td>'
+  +        '<td class="lb">A.R.T.</td><td>'+_esc(obra.art||'')+'</td></tr>'
+  + '  </table>'
+  + '  <table class="datos">'
+  + '    <tr><td class="lb">Apellido y nombre</td><td colspan="3">'+_esc(op.nombre||'')+'</td></tr>'
+  + '    <tr><td class="lb">D.N.I. / C.U.I.L.</td><td>'+_esc(op.dni||'')+'</td>'
+  +        '<td class="lb">Puesto / Sector</td><td>'+_esc(op.puesto||'')+'</td></tr>'
+  + '  </table>'
+  + '  <table class="items">'
+  + '    <thead><tr>'
+  + '      <th style="width:12%">Fecha de<br>entrega</th>'
+  + '      <th style="width:26%">Producto entregado</th>'
+  + '      <th style="width:12%">Tipo</th>'
+  + '      <th style="width:7%">Cant.</th>'
+  + '      <th style="width:14%">Marca /<br>Modelo</th>'
+  + '      <th style="width:14%">Certificaci&oacute;n<br>(Norma IRAM)</th>'
+  + '      <th style="width:15%">Firma del<br>trabajador</th>'
+  + '    </tr></thead>'
+  + '    <tbody>'+cuerpo+'</tbody>'
+  + '  </table>'
+  + '  <div class="decl">'
+  + '    Por la presente dejo constancia de haber recibido sin cargo los elementos de protecci&oacute;n personal y la ropa de '
+  + '    trabajo detallados precedentemente, adecuados a los riesgos de mi puesto de trabajo. Asimismo declaro haber sido '
+  + '    <b>capacitado sobre su uso correcto, conservaci&oacute;n y mantenimiento</b>, y me comprometo a utilizarlos durante toda '
+  + '    la jornada laboral, a conservarlos en buen estado y a solicitar su reposici&oacute;n ante deterioro, p&eacute;rdida o '
+  + '    vencimiento, conforme lo establecido en la Ley 19.587 de Higiene y Seguridad en el Trabajo, el Decreto 911/96 y la '
+  + '    Resoluci&oacute;n S.R.T. N&deg; 299/2011.'
+  + '  </div>'
+  + '  <table class="firmas">'
+  + '    <tr>'
+  + '      <td><div class="ln"></div>Firma del trabajador</td>'
+  + '      <td><div class="ln"></div>Aclaraci&oacute;n</td>'
+  + '      <td><div class="ln"></div>Firma y sello del empleador</td>'
+  + '    </tr>'
+  + '  </table>'
+  + '  <div class="pie">Lugar y fecha: ____________________________________ &nbsp;&nbsp; '
+  + '  Documento generado por el Sistema HyS &mdash; ' + _esc(EMPRESA_299.razon) + '</div>'
+  + '</div>';
+}
+
+function imprimirConstancia(idx){
+  var lista;
+  if(idx==='all'){
+    lista=(obra.personal||[]);
+    if(!lista.length){ alert('No hay operarios cargados.'); return; }
+  }else{
+    if(idx===null||idx===undefined){ alert('Guardá el operario antes de imprimir la constancia.'); return; }
+    var op=(obra.personal||[])[idx];
+    if(!op){ alert('No se encontró el operario.'); return; }
+    lista=[op];
+  }
+  var faltantes=lista.filter(function(o){ return !o.dni || !o.puesto; }).length;
+  if(faltantes && !confirm('Hay '+faltantes+' operario(s) sin DNI o puesto cargado. La constancia se imprimirá con esos campos en blanco para completar a mano.\n\n¿Continuar?')) return;
+
+  var css = '@page{size:A4 landscape;margin:12mm}'
+    + '*{box-sizing:border-box}'
+    + 'body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:0;font-size:10px}'
+    + '.hoja{page-break-after:always;padding:0 0 6px 0}'
+    + '.hoja:last-child{page-break-after:auto}'
+    + '.tit{text-align:center;font-size:15px;font-weight:bold;line-height:1.25;margin-bottom:3px}'
+    + '.sub{text-align:center;font-size:9px;margin-bottom:10px}'
+    + 'table{width:100%;border-collapse:collapse;margin-bottom:8px}'
+    + '.datos td{border:1px solid #000;padding:4px 6px;font-size:10px}'
+    + '.datos .lb{background:#eee;font-weight:bold;width:19%;white-space:nowrap}'
+    + '.items th{border:1px solid #000;padding:4px 3px;font-size:9px;background:#eee;text-align:center;line-height:1.2}'
+    + '.items td{border:1px solid #000;padding:5px 5px;font-size:9.5px;height:19px}'
+    + '.items td.c{text-align:center}'
+    + '.items td.firma{background:#fcfcfc}'
+    + '.decl{border:1px solid #000;padding:7px 10px;font-size:9px;text-align:justify;line-height:1.4;margin-bottom:14px}'
+    + '.firmas{margin-top:26px}'
+    + '.firmas td{width:33.33%;text-align:center;font-size:9px;padding:0 26px;vertical-align:bottom}'
+    + '.firmas .ln{border-top:1px solid #000;margin-bottom:3px}'
+    + '.pie{margin-top:14px;font-size:8px;color:#333}'
+    + '@media screen{body{background:#f0f0f0;padding:16px}.hoja{background:#fff;padding:12mm 14mm;margin:0 auto 14px;max-width:297mm;box-shadow:0 1px 5px rgba(0,0,0,.2)}}';
+
+  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+    + '<title>Constancia EPP - Res. 299/11</title><style>'+css+'</style></head><body>'
+    + lista.map(_hojaConstancia).join('')
+    + '<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},350);};</scr'+'ipt>'
+    + '</body></html>';
+
+  var w=window.open('','_blank');
+  if(!w){ alert('El navegador bloqueó la ventana emergente. Permitila para imprimir la constancia.'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+// -- DOCUMENTOS FIJOS (Prog. Seguridad / Plan de trabajo) --
+const DF_META = {
+  ps:   { titulo:'📄 Programa de Seguridad', carpeta:'_prog_seguridad', sub:'Documento vigente de la obra', multi:false },
+  plan: { titulo:'📐 Plan de trabajo',       carpeta:'_plan_trabajo',   sub:'Planes de arquitectura (podés cargar varios)', multi:true }
+};
+var currentDF = null;
+
+function getDocsFijos(tipo){
+  return (obra.archivos||[]).filter(function(f){ return f.tipo===tipo; });
+}
+function getDocFijo(tipo){ return getDocsFijos(tipo)[0] || null; }
+
+function openDocFijo(tipo){
+  currentDF = tipo;
+  document.getElementById('df-title').textContent = DF_META[tipo].titulo;
+  document.getElementById('df-sub').textContent   = DF_META[tipo].sub;
+  document.getElementById('df-status').textContent = '';
+  var inp = document.getElementById('df-file');
+  inp.value = '';
+  if(DF_META[tipo].multi) inp.setAttribute('multiple','multiple'); else inp.removeAttribute('multiple');
+  renderDocFijo();
+  document.getElementById('docfijo-modal').classList.add('open');
+}
+function closeDocFijo(){
+  document.getElementById('docfijo-modal').classList.remove('open');
+}
+
+function _filaDocFijo(f, idx){
+  var legacy = !f.path;
+  return '<div style="display:flex;align-items:center;gap:10px;border:1px solid #e8eaf0;border-radius:8px;padding:10px 12px;margin-bottom:6px">'
+    + '<span style="font-size:22px">📄</span>'
+    + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:12px;font-weight:700;color:#1a2332;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</div>'
+      + '<div style="font-size:9px;color:#888">Cargado el ' + (f.fecha||'-') + (f.size?' &middot; '+Math.round(f.size/1024)+' KB':'') + '</div>'
+      + (legacy?'<div style="font-size:9px;color:#c0392b;margin-top:3px">Registro antiguo sin archivo adjunto. Volvé a subirlo.</div>':'')
+    + '</div>'
+    + (legacy?'':'<button onclick="verDocFijo('+idx+')" style="font-size:10px;color:#1a4fa0;background:#fff;padding:5px 10px;border:1px solid #1a4fa0;border-radius:4px;cursor:pointer">Ver</button>')
+    + '<button onclick="eliminarDocFijo('+idx+')" style="background:#fde8e8;color:#c0392b;border:none;border-radius:4px;padding:5px 9px;font-size:10px;cursor:pointer">x</button>'
+    + '</div>';
+}
+
+function renderDocFijo(){
+  var lista = getDocsFijos(currentDF);
+  var wrap = document.getElementById('df-actual');
+  var up   = document.getElementById('df-uplabel');
+  var multi = DF_META[currentDF].multi;
+  if(!lista.length){
+    wrap.innerHTML = '<div style="font-size:11px;color:#bbb;padding:10px 0;text-align:center">No hay documentos cargados para esta obra.</div>';
+    up.textContent = multi ? 'Agregar archivos' : 'Cargar archivo';
+    return;
+  }
+  up.textContent = multi ? 'Agregar más archivos' : 'Reemplazar archivo';
+  wrap.innerHTML = (multi
+      ? '<div style="font-size:10px;color:#888;margin-bottom:6px">'+lista.length+(lista.length===1?' archivo cargado':' archivos cargados')+'</div>'
+      : '')
+    + lista.map(_filaDocFijo).join('');
+}
+
+function verDocFijo(idx){
+  var f = getDocsFijos(currentDF)[idx||0];
+  if(!f || !f.path) return;
+  var w = window.open('', '_blank');
+  fetch(SB_STORAGE_URL + '/object/sign/' + BUCKET + '/' + f.path, {
+    method:'POST', headers: jhdrs(), body: JSON.stringify({ expiresIn: 3600 })
+  }).then(function(r){ return r.json(); })
+  .then(function(d){
+    if(!d.signedURL) throw new Error(d.message||'No se pudo firmar');
+    w.location.href = SB_STORAGE_URL + d.signedURL;
+  }).catch(function(e){
+    if(w) w.close();
+    alert('No se pudo abrir el documento: ' + e.message);
+  });
+}
+
+function subirDocFijo(){
+  var input = document.getElementById('df-file');
+  var files = Array.prototype.slice.call(input.files||[]);
+  var st = document.getElementById('df-status');
+  if(!files.length){ st.textContent='Elegí al menos un archivo.'; st.style.color='#c0392b'; return; }
+
+  var tipo = currentDF;
+  var multi = DF_META[tipo].multi;
+  if(!multi) files = files.slice(0,1);
+
+  st.textContent = 'Subiendo ' + files.length + (files.length===1?' archivo...':' archivos...');
+  st.style.color = '#856404';
+
+  var previos = multi ? [] : getDocsFijos(tipo);
+
+  var tareas = files.map(function(file){
+    var path = OBRA_ID + '/' + DF_META[tipo].carpeta + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,7) + '_' + file.name.replace(/\s/g,'_');
+    return fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + path, {
+      method:'POST', headers: hdrs({ 'Content-Type': file.type, 'x-upsert':'true' }), body: file
+    }).then(function(r){
+      if(!r.ok) throw new Error('No se pudo subir "' + file.name + '"');
+      return { name:file.name, size:file.size, path:path, type:file.type,
+               fecha:new Date().toLocaleDateString('es-AR'), tipo:tipo };
+    });
+  });
+
+  Promise.all(tareas).then(function(nuevos){
+    previos.forEach(function(p){
+      if(p.path) fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + p.path, { method:'DELETE', headers: hdrs() });
+    });
+    if(!obra.archivos) obra.archivos=[];
+    if(!multi) obra.archivos = obra.archivos.filter(function(f){ return f.tipo!==tipo; });
+    obra.archivos = obra.archivos.concat(nuevos);
+    _saveData();
+    input.value='';
+    st.textContent = nuevos.length + (nuevos.length===1?' archivo cargado.':' archivos cargados.');
+    st.style.color='#1a6b2e';
+    renderDocFijo(); renderDFBadges();
+    setTimeout(function(){ st.textContent=''; },3000);
+  }).catch(function(e){
+    st.textContent='Error: '+e.message; st.style.color='#c0392b';
+    renderDocFijo(); renderDFBadges();
+  });
+}
+
+function eliminarDocFijo(idx){
+  var lista = getDocsFijos(currentDF);
+  var f = lista[idx||0];
+  if(!f) return;
+  if(!confirm('Eliminar "' + f.name + '"?')) return;
+  if(f.path) fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + f.path, { method:'DELETE', headers: hdrs() });
+  obra.archivos = (obra.archivos||[]).filter(function(x){ return x!==f; });
+  _saveData();
+  renderDocFijo(); renderDFBadges();
+}
+
+function renderDFBadges(){
+  [['ps','btn-ps','📄 Prog. Seguridad'],['plan','btn-plan','📐 Plan de trabajo']].forEach(function(t){
+    var b=document.getElementById(t[1]); if(!b) return;
+    var n=getDocsFijos(t[0]).length;
+    b.textContent = t[2] + (n ? (DF_META[t[0]].multi && n>1 ? ' ('+n+')' : ' ✓') : ' +');
+  });
 }
 
 // -- EXPORT / IMPORT --
@@ -1095,11 +1463,13 @@ function procesarImportJSON(){
     }else{
       if(parsed.obra_inicio&&!obra.inicio)obra.inicio=parsed.obra_inicio;
       if(parsed.obra_fin&&!obra.fin)obra.fin=parsed.obra_fin;
-      obra.eventos=(obra.eventos||[]).filter(e=>e.type!=='plan');
+      const nombrePlan=(parsed.plan_nombre||parsed.obra_nombre||'Plan de trabajo (Arq.)').trim();
+      // reemplaza solo las etapas de ESTE plan; los demás planes se conservan
+      obra.eventos=(obra.eventos||[]).filter(e=>e.type!=='plan'||planNombre(e)!==nombrePlan);
       const etapas=parsed.etapas||parsed.eventos||[];
       etapas.forEach(item=>{
         if(item.desc&&item.inicio&&item.fin){
-          obra.eventos.push({type:'plan',desc:item.desc+(item.grupo?' ('+item.grupo+')':''),inicio:item.inicio,fin:item.fin,obs:item.grupo||''});
+          obra.eventos.push({type:'plan',plan:nombrePlan,desc:item.desc+(item.grupo?' ('+item.grupo+')':''),inicio:item.inicio,fin:item.fin,obs:item.grupo||''});
           added++;
         }
       });
@@ -1177,7 +1547,8 @@ function renderPersonalList(){
         <div style="font-size:12px;font-weight:700;color:#1a2332">${op.nombre||'Sin nombre'}</div>
         <div style="font-size:10px;color:#888;margin-top:2px">👕 ${ropaCount} prendas acumuladas  .  🦺 ${eppCount} ítems EPP acumulados</div>
       </div>
-      <div style="font-size:11px;color:#1a4fa0">Editar Editar</div>
+      <button onclick="event.stopPropagation();imprimirConstancia(${i})" title="Imprimir constancia Res. 299/11" style="background:#e8f0fb;color:#1a4fa0;border:1px solid #b8cde8;border-radius:5px;padding:5px 9px;font-size:10px;cursor:pointer;white-space:nowrap">🖨 Constancia</button>
+      <div style="font-size:11px;color:#1a4fa0">Editar</div>
     </div>`;
   }).join('');
 }
@@ -1187,6 +1558,9 @@ function openOperarioForm(idx){
   const op=idx!==null?obra.personal[idx]:null;
   document.getElementById('op-title').textContent=op?'Editar operario':'Nuevo operario';
   document.getElementById('op-nombre').value=op?op.nombre||'':'';
+  document.getElementById('op-dni').value=op?op.dni||'':'';
+  document.getElementById('op-puesto').value=op?op.puesto||'':'';
+  document.getElementById('op-print-btn').style.display=op?'':'none';
   document.getElementById('op-obs').value=op?op.obs||'':'';
   ropaRows=op&&op.ropa?JSON.parse(JSON.stringify(op.ropa)):[];
   eppRows=op&&op.epp?JSON.parse(JSON.stringify(op.epp)):[];
@@ -1260,6 +1634,8 @@ function guardarOperario(){
   if(!nombre){alert('Ingresá el apellido y nombre del operario.');return;}
   const op={
     nombre,
+    dni:document.getElementById('op-dni').value.trim(),
+    puesto:document.getElementById('op-puesto').value.trim(),
     ropa:ropaRows.filter(r=>r.item),
     epp:eppRows.filter(r=>r.item),
     obs:document.getElementById('op-obs').value
@@ -1667,10 +2043,28 @@ function renderDocsList() {
       + '<div style="font-size:11px;font-weight:600;color:#1a2332">' + doc.name + '</div>'
       + '<div style="font-size:9px;color:#888">' + (doc.fecha || '') + '</div>'
       + '</div>'
-      + '<a href="' + doc.url + '" target="_blank" style="font-size:10px;color:#1a4fa0;text-decoration:none;padding:3px 8px;border:1px solid #1a4fa0;border-radius:4px">Ver</a>'
+      + '<button onclick="verDoc(' + i + ')" style="font-size:10px;color:#1a4fa0;background:#fff;text-decoration:none;padding:3px 8px;border:1px solid #1a4fa0;border-radius:4px;cursor:pointer">Ver</button>'
       + '<button onclick="eliminarDoc(' + i + ')" style="background:#fde8e8;color:#c0392b;border:none;border-radius:4px;padding:3px 8px;font-size:10px;cursor:pointer">x</button>'
       + '</div>';
   }).join('');
+}
+
+function verDoc(i) {
+  var docs = (obra.docs || {})[currentDocsWk] || [];
+  var doc = docs[i];
+  if (!doc) return;
+  if (!doc.path) { if (doc.url) window.open(doc.url, '_blank'); return; }
+  var w = window.open('', '_blank');
+  fetch(SB_STORAGE_URL + '/object/sign/' + BUCKET + '/' + doc.path, {
+    method: 'POST', headers: jhdrs(), body: JSON.stringify({ expiresIn: 3600 })
+  }).then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.signedURL) throw new Error(d.message || 'No se pudo firmar');
+    w.location.href = SB_STORAGE_URL + d.signedURL;
+  }).catch(function(e){
+    if (w) w.close();
+    alert('No se pudo abrir el documento: ' + e.message);
+  });
 }
 
 function eliminarDoc(i) {
@@ -1681,7 +2075,7 @@ function eliminarDoc(i) {
   if (doc && doc.path) {
     fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + doc.path, {
       method: 'DELETE',
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+      headers: hdrs()
     });
   }
   docs.splice(i, 1);
@@ -1704,23 +2098,14 @@ function subirDoc() {
     var path = OBRA_ID + '/' + currentDocsWk + '/' + Date.now() + '_' + file.name.replace(/\s/g, '_');
     return fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + path, {
       method: 'POST',
-      headers: {
-        'apikey': SB_KEY,
-        'Authorization': 'Bearer ' + SB_KEY,
-        'Content-Type': file.type,
-        'x-upsert': 'true'
-      },
+      headers: hdrs({ 'Content-Type': file.type, 'x-upsert': 'true' }),
       body: file
     }).then(function(r) {
       if (!r.ok) throw new Error('Error subiendo ' + file.name);
       // Get public URL via signed URL (1 year)
       return fetch(SB_STORAGE_URL + '/object/sign/' + BUCKET + '/' + path, {
         method: 'POST',
-        headers: {
-          'apikey': SB_KEY,
-          'Authorization': 'Bearer ' + SB_KEY,
-          'Content-Type': 'application/json'
-        },
+        headers: jhdrs(),
         body: JSON.stringify({ expiresIn: 31536000 })
       });
     }).then(function(r) { return r.json(); })
@@ -1754,120 +2139,33 @@ function subirDoc() {
 }
 
 document.getElementById('docs-modal').addEventListener('click', function(e) { if (e.target === this) closeDocsModal(); });
-
-
-// -- FOTOS RELEVAMIENTO --
-function subirFotosChk(){
-  var input = document.getElementById('chk-foto-input');
-  var files = input.files;
-  if(!files.length) return;
-  var statusEl = document.getElementById('chk-foto-status');
-  var preview = document.getElementById('chk-fotos-preview');
-  statusEl.textContent = 'Subiendo fotos...';
-  statusEl.style.color = '#856404';
-
-  var promises = Array.from(files).map(function(file){
-    var path = OBRA_ID + '/relevamiento/' + activeWK + '/' + Date.now() + '_' + file.name.replace(/\s/g,'_');
-    return fetch(SB_URL+'/storage/v1/object/obras-docs/'+path,{
-      method:'POST',
-      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':file.type,'x-upsert':'true'},
-      body:file
-    }).then(function(r){
-      if(!r.ok) throw new Error('Error subiendo '+file.name);
-      return fetch(SB_URL+'/storage/v1/object/sign/obras-docs/'+path,{
-        method:'POST',
-        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
-        body:JSON.stringify({expiresIn:31536000})
-      });
-    }).then(function(r){return r.json();})
-    .then(function(data){
-      return {name:file.name, path:path, url:SB_URL+'/storage/v1'+data.signedURL, type:file.type};
-    });
-  });
-
-  Promise.all(promises).then(function(fotos){
-    if(!chkTemp.fotos) chkTemp.fotos = [];
-    chkTemp.fotos = chkTemp.fotos.concat(fotos);
-    input.value = '';
-    statusEl.textContent = fotos.length + ' foto(s) subida(s)';
-    statusEl.style.color = '#1a6b2e';
-    renderFotosChk();
-    setTimeout(function(){statusEl.textContent='';},3000);
-  }).catch(function(err){
-    statusEl.textContent = 'Error: '+err.message;
-    statusEl.style.color = '#c0392b';
-  });
-}
-
-function renderFotosChk(){
-  var preview = document.getElementById('chk-fotos-preview');
-  if(!preview) return;
-  var fotos = chkTemp.fotos || [];
-  preview.innerHTML = fotos.map(function(f,i){
-    return '<div style="position:relative">'
-      +'<a href="'+f.url+'" target="_blank"><img src="'+f.url+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #e8eaf0"></a>'
-      +'<button onclick="eliminarFotoChk('+i+')" style="position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;cursor:pointer;line-height:1">x</button>'
-      +'</div>';
-  }).join('');
-}
-
-function eliminarFotoChk(i){
-  if(!chkTemp.fotos) return;
-  chkTemp.fotos.splice(i,1);
-  renderFotosChk();
-}
-
-// -- ENVIAR INFORME POR MAIL --
-function enviarInformeEmail(){
-  var wk = activeWK;
-  var rel = chkTemp;
-  var obraLabel = obra.nombre || OBRA_ID;
-  var fecha = new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-
-  var body = 'RELEVAMIENTO SEMANAL - ' + obraLabel + '\n';
-  body += 'Semana: ' + wk + '\n';
-  body += 'Fecha: ' + fecha + '\n';
-  body += 'Responsable: ' + (obra.tecnico || '-') + '\n';
-  body += '\n';
-
-  if(rel._noRelev){
-    body += 'Sin relevamiento esta semana.\n';
-  } else {
-    CATS.forEach(function(cat){
-      var cd = rel[cat.key] || {};
-      body += '\n--- ' + cat.label.toUpperCase() + ' ---\n';
-      cat.items.forEach(function(item){
-        var est = (cd[item] && cd[item].estado) || 'sin datos';
-        var emoji = est==='ok'?'OK':est==='att'?'PRECAUCION':est==='prob'?'PROBLEMA':'---';
-        body += '  ' + emoji + ' | ' + item + '\n';
-      });
-      if(cd._obs) body += '  Obs: ' + cd._obs + '\n';
-    });
-  }
-
-  var fotos = rel.fotos || [];
-  if(fotos.length){
-    body += '\n--- FOTOS ADJUNTAS ---\n';
-    fotos.forEach(function(f){ body += f.url + '\n'; });
-  }
-
-  var subject = 'Relevamiento HyS - ' + obraLabel + ' - Semana ' + wk;
-  var mailto = 'mailto:yingoseguridadehigiene@gmail.com'
-    + '?subject=' + encodeURIComponent(subject)
-    + '&body=' + encodeURIComponent(body);
-
-  window.open(mailto, '_blank');
-}
+document.getElementById('docfijo-modal').addEventListener('click', function(e) { if (e.target === this) closeDocFijo(); });
 
 // -- INIT --
-(async()=>{
+let _booted=false;
+async function bootApp(){
+  if(_booted) return;
+  _booted=true;
   loadLocal();
   const ind=document.getElementById('save-indicator');
   ind.textContent='* Cargando...';ind.style.opacity='1';
   await _loadSB();
   ind.style.opacity='0';
+  const au=document.getElementById('auth-user');
+  if(au) au.textContent=localStorage.getItem('hs_email')||'';
   renderSB();
   renderTL();
+  renderDFBadges();
+}
+
+(async()=>{
+  const ok=await refreshToken();
+  if(ok){
+    document.getElementById('auth-gate').style.display='none';
+    await bootApp();
+  }else{
+    document.getElementById('auth-email').focus();
+  }
 })();
 </script>
 </body>
