@@ -774,7 +774,7 @@ function barRow(label,color,evArr,type,opts){
   }).join('');
   const rowId=opts.rowId||type;
   return`<div class="gantt-row">
-    <div class="grl"><div class="grl-dot" style="background:${color}"></div><div class="grl-txt">${label}</div>${opts.delPlan?`<button onclick="eliminarPlan('${(opts.delPlan+'').replace(/'/g,"")}')" title="Eliminar este plan de la línea de tiempo" style="background:none;border:none;color:#c0392b;font-size:13px;cursor:pointer;padding:0 2px;line-height:1">×</button>`:''}</div>
+    <div class="grl"><div class="grl-dot" style="background:${color}"></div><div class="grl-txt">${label}</div>${opts.delBloque?`<button onclick="eliminarBloque('${(opts.delBloque+'').replace(/'/g,"")}','${(opts.delLabel||'').replace(/'/g,"")}')" title="Eliminar esta importación de la línea de tiempo" style="background:none;border:none;color:#c0392b;font-size:13px;cursor:pointer;padding:0 2px;line-height:1">×</button>`:opts.delPlan?`<button onclick="eliminarPlan('${(opts.delPlan+'').replace(/'/g,"")}')" title="Eliminar este plan de la línea de tiempo" style="background:none;border:none;color:#c0392b;font-size:13px;cursor:pointer;padding:0 2px;line-height:1">×</button>`:''}</div>
     <div class="gantt-row-bars">${bars}<div class="gantt-today" id="gt-${rowId}" style="display:none"></div></div>
   </div>`;
 }
@@ -782,18 +782,37 @@ function barRow(label,color,evArr,type,opts){
 // -- PLANES DE TRABAJO (uno o varios) --
 const PLAN_COLORES=['#c0392b','#0e7c86','#b8860b','#6a1b9a','#2e7d32','#c2185b','#455a64'];
 function planNombre(ev){ return ev.plan || 'Plan de trabajo (Arq.)'; }
-function eliminarPlan(nombre){
-  const evs=(obra.eventos||[]).filter(e=>e.type==='plan'&&planNombre(e)===nombre);
+
+// Cada importación de Plan o de Programa de Seguridad crea un BLOQUE con importId único,
+// que se dibuja como una fila propia. Reemplazar = importar de nuevo = fila nueva debajo.
+function eliminarBloque(importId, etiqueta){
+  const evs=(obra.eventos||[]).filter(e=>e.importId===importId);
   if(!evs.length)return;
-  if(!confirm('¿Eliminar el plan "'+nombre+'" de la línea de tiempo?\n\n'
-    +'Se borrarán '+evs.length+' etapas. Los archivos PDF cargados en la pastilla '
-    +'"Plan de trabajo" NO se borran: eso se hace por separado desde ahí.'))return;
-  obra.eventos=(obra.eventos||[]).filter(e=>!(e.type==='plan'&&planNombre(e)===nombre));
+  if(!confirm('¿Eliminar "'+etiqueta+'" de la línea de tiempo?\n\n'
+    +'Se borrarán '+evs.length+' ítems de esta importación. Los archivos PDF cargados en '
+    +'las pastillas NO se borran: eso se hace por separado desde ahí.'))return;
+  obra.eventos=(obra.eventos||[]).filter(e=>e.importId!==importId);
   _saveData();showSaveOK();renderTL();
 }
 
+// Todas las filas de tipo bloque (planes y programas de seguridad), en orden de importación.
+function bloquesDeObra(){
+  const evs=(obra.eventos||[]).filter(e=>e.importId&&(e.type==='plan'||e.type==='etapa'||e.type==='cap'));
+  const map=new Map();
+  evs.forEach(e=>{ if(!map.has(e.importId))map.set(e.importId,[]); map.get(e.importId).push(e); });
+  // ordenar por importId (incluye timestamp) para que las nuevas queden abajo
+  const ids=Array.from(map.keys()).sort();
+  return ids.map((id,i)=>{
+    const arr=map.get(id);
+    const first=arr[0];
+    const nombre=first.bloqueLabel||planNombre(first);
+    return { importId:id, nombre, eventos:arr, color:PLAN_COLORES[i%PLAN_COLORES.length], key:'blk'+i };
+  });
+}
+
+// Compatibilidad: planes/etapas SIN importId (cargados antes de este cambio o a mano).
 function planesDeObra(){
-  const evs=(obra.eventos||[]).filter(e=>e.type==='plan');
+  const evs=(obra.eventos||[]).filter(e=>e.type==='plan'&&!e.importId);
   const map=new Map();
   evs.forEach(e=>{ const k=planNombre(e); if(!map.has(k))map.set(k,[]); map.get(k).push(e); });
   return Array.from(map.entries()).map(([nombre,eventos],i)=>({
@@ -814,11 +833,11 @@ function buildSrvEvs(){
 function renderTL(){
   if(!obra.inicio||!obra.fin){document.getElementById('tl-wrap').innerHTML='<div style="padding:20px;color:#888;font-size:12px">Completá la información de la obra para ver la línea de tiempo.</div>';return;}
   const evs=obra.eventos||[];
-  const planEvs=evs.filter(e=>e.type==='plan');
-  const planes=planesDeObra();
+  const bloques=bloquesDeObra();
+  const planes=planesDeObra();                                   // planes legacy sin importId
   const srvEvs=buildSrvEvs();
-  const etapas=evs.filter(e=>e.type==='etapa');
-  const caps=evs.filter(e=>e.type==='cap');
+  const etapas=evs.filter(e=>e.type==='etapa'&&!e.importId);      // etapas HyS sueltas (sin bloque)
+  const caps=evs.filter(e=>e.type==='cap'&&!e.importId);          // capacitaciones sueltas
   const insps=evs.filter(e=>e.type==='insp');
 
   // Build months header
@@ -834,19 +853,19 @@ function renderTL(){
   <div class="tl-wrap">
     <div class="tl-head">
       <span class="tl-title">Línea de tiempo  -  ${obra.nombre||''}</span>
+      ${bloques.map(b=>`<div class="leg"><div class="leg-pill" style="background:${b.color}"></div>${b.nombre}</div>`).join('')}
       ${planes.map(p=>`<div class="leg"><div class="leg-pill" style="background:${p.color}"></div>${p.nombre}</div>`).join('')}
-
-      <div class="leg"><div class="leg-pill" style="background:#1a4fa0"></div>Etapas HyS</div>
-      <div class="leg"><div class="leg-pill" style="background:#1a6b2e"></div>Capacitaciones</div>
+      ${etapas.length?'<div class="leg"><div class="leg-pill" style="background:#1a4fa0"></div>Etapas HyS</div>':''}
+      ${caps.length?'<div class="leg"><div class="leg-pill" style="background:#1a6b2e"></div>Capacitaciones</div>':''}
       <div class="leg"><div class="leg-pill" style="background:#7c3fa0"></div>Inspecciones</div>
       <div style="margin-left:auto;font-size:10px;color:#888">Clic en "Abrir" para el relevamiento</div>
     </div>
     <div class="gantt-table"><div class="gantt-inner">
       <div class="gantt-months" style="padding-left:160px">${mHead}</div>
+      ${bloques.map(b=>barRow(b.nombre,b.color,b.eventos,(b.eventos[0]&&b.eventos[0].type)||'plan',{color:b.color,planKey:b.importId,rowId:b.key,delBloque:b.importId,delLabel:b.nombre})).join('')}
       ${planes.map(p=>barRow(p.nombre,p.color,p.eventos,'plan',{color:p.color,planKey:p.nombre,rowId:p.key,delPlan:p.nombre})).join('')}
-
-      ${barRow('Etapas constructivas','#1a4fa0',etapas,'etapa')}
-      ${barRow('Capacitaciones','#1a6b2e',caps,'cap')}
+      ${etapas.length?barRow('Etapas constructivas','#1a4fa0',etapas,'etapa'):''}
+      ${caps.length?barRow('Capacitaciones','#1a6b2e',caps,'cap'):''}
       ${barRow('Inspecciones HyS','#7c3fa0',insps,'insp')}
     </div></div>
   </div>`;
@@ -891,7 +910,11 @@ function clickBar(idx,type,planKey){
     }
   } else {
     let evs=(obra.eventos||[]).filter(e=>e.type===type);
-    if(type==='plan'&&planKey) evs=evs.filter(e=>planNombre(e)===planKey);
+    // planKey puede ser un importId (bloque) o un nombre de plan (legacy)
+    if(planKey){
+      const porId=evs.filter(e=>e.importId===planKey);
+      evs = porId.length ? porId : evs.filter(e=>planNombre(e)===planKey);
+    }
     const ev=evs[idx];
     if(ev)alert((type==='plan'?planNombre(ev)+'\n\n':'')+ev.desc+(ev.obs?'\n'+ev.obs:'')+'\n'+fmtD(ev.inicio)+' -> '+fmtD(ev.fin));
   }
@@ -1451,6 +1474,10 @@ function procesarImportJSON(){
   try{
     const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
     let added=0;
+    // Cada importación genera un BLOQUE con importId único => una fila nueva en el Gantt,
+    // debajo de las anteriores. Reemplazar un archivo = importar de nuevo = fila nueva.
+    const importId='imp'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    const stamp=new Date().toLocaleDateString('es-AR');
     if(tipo==='ps'){
       if(parsed.obra_nombre)obra.nombre=parsed.obra_nombre;
       if(parsed.obra_inicio)obra.inicio=parsed.obra_inicio;
@@ -1458,18 +1485,24 @@ function procesarImportJSON(){
       if(parsed.art)obra.art=parsed.art;
       if(parsed.tecnico)obra.tecnico=parsed.tecnico;
       const eventos=parsed.eventos||[];
-      const seen=new Set((obra.eventos||[]).map(e=>e.desc+e.inicio));
-      eventos.forEach(ev=>{if(!seen.has(ev.desc+ev.inicio)){obra.eventos.push(ev);seen.add(ev.desc+ev.inicio);added++;}});
+      const nom=(parsed.obra_nombre||'Prog. Seguridad');
+      const label='📋 '+nom+' · '+stamp;
+      if(!obra.eventos)obra.eventos=[];
+      eventos.forEach(ev=>{
+        obra.eventos.push(Object.assign({}, ev, {importId, bloqueLabel:label}));
+        added++;
+      });
     }else{
       if(parsed.obra_inicio&&!obra.inicio)obra.inicio=parsed.obra_inicio;
       if(parsed.obra_fin&&!obra.fin)obra.fin=parsed.obra_fin;
       const nombrePlan=(parsed.plan_nombre||parsed.obra_nombre||'Plan de trabajo (Arq.)').trim();
-      // reemplaza solo las etapas de ESTE plan; los demás planes se conservan
-      obra.eventos=(obra.eventos||[]).filter(e=>e.type!=='plan'||planNombre(e)!==nombrePlan);
+      const label='📐 '+nombrePlan+' · '+stamp;
       const etapas=parsed.etapas||parsed.eventos||[];
+      if(!obra.eventos)obra.eventos=[];
       etapas.forEach(item=>{
         if(item.desc&&item.inicio&&item.fin){
-          obra.eventos.push({type:'plan',plan:nombrePlan,desc:item.desc+(item.grupo?' ('+item.grupo+')':''),inicio:item.inicio,fin:item.fin,obs:item.grupo||''});
+          obra.eventos.push({type:'plan',plan:nombrePlan,importId,bloqueLabel:label,
+            desc:item.desc+(item.grupo?' ('+item.grupo+')':''),inicio:item.inicio,fin:item.fin,obs:item.grupo||''});
           added++;
         }
       });
