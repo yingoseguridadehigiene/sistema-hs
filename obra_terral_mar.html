@@ -841,7 +841,7 @@ function renderTL(){
   const insps=evs.filter(e=>e.type==='insp');
 
   // Build months header
-  const t=toD(obra.inicio),e=toD(obra.fin);
+  const t=toD(rangoInicio()),e=toD(rangoFin());
   const months=[];let cur=new Date(t.getFullYear(),t.getMonth(),1);
   while(cur<=e){months.push(new Date(cur));cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);}
   const mHead=months.map(m=>{
@@ -873,7 +873,12 @@ function renderTL(){
   renderWT();
   // Scroll to current week after render
   setTimeout(()=>{
-    const el=document.getElementById('semana-actual-row');
+    let el=document.getElementById('semana-actual-row');
+    // si hoy quedó fuera del rango, ubicar la semana más cercana a hoy
+    if(!el){
+      const filas=document.querySelectorAll('.wt-row');
+      if(filas.length) el=filas[filas.length-1];
+    }
     if(el){
       const scroll=el.closest('.wt-scroll');
       if(scroll){
@@ -921,13 +926,31 @@ function clickBar(idx,type,planKey){
 }
 
 // -- RENDER WEEK TABLE --
+// Rango real de la línea de tiempo: cubre las fechas de obra, TODOS los eventos
+// (planes/etapas/capacitaciones importados) y la fecha de hoy, para que la semana
+// actual siempre aparezca aunque el fin de obra cargado sea anterior.
+function rangoInicio(){
+  const fechas=[obra.inicio].filter(Boolean);
+  (obra.eventos||[]).forEach(e=>{ if(e.inicio)fechas.push(e.inicio); });
+  const hoy=new Date().toISOString().slice(0,10);
+  fechas.push(hoy);
+  return fechas.sort()[0];
+}
+function rangoFin(){
+  const fechas=[obra.fin].filter(Boolean);
+  (obra.eventos||[]).forEach(e=>{ if(e.fin)fechas.push(e.fin); });
+  const hoy=new Date().toISOString().slice(0,10);
+  fechas.push(hoy);
+  return fechas.sort()[fechas.length-1];
+}
+
 function renderWT(){
   if(!obra.inicio||!obra.fin){
     document.getElementById('wt-wrap').innerHTML='<div style="padding:20px;color:#aaa;font-size:12px">Cargá las fechas de inicio y fin de la obra para ver el calendario semanal.</div>';
     return;
   }
   try{
-  const t=toD(obra.inicio),e=toD(obra.fin);
+  const t=toD(rangoInicio()),e=toD(rangoFin());
   const todayWK=wkKey();
   const weeks=[];let cur=new Date(t);cur.setDate(cur.getDate()-((cur.getDay()+6)%7));
   while(cur<=e){weeks.push(cur.toISOString().slice(0,10));cur=new Date(cur);cur.setDate(cur.getDate()+7);}
