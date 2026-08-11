@@ -129,7 +129,13 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f7;color:#1a2332;mi
 
 <!-- TABLERO -->
 <div class="view active" id="view-tablero">
-  <div class="sec-title">Estado de obras — semana actual</div>
+  <div class="sec-title">Estado de obras por semana</div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+    <button onclick="tabSemana(-1)" style="background:#fff;border:1px solid #d0d4db;border-radius:6px;padding:5px 11px;font-size:12px;cursor:pointer">‹ Anterior</button>
+    <select id="tablero-wk-sel" onchange="tabSemanaSel(this.value)" style="border:1px solid #d0d4db;border-radius:6px;padding:5px 10px;font-size:12px;min-width:230px"></select>
+    <button onclick="tabSemana(1)" style="background:#fff;border:1px solid #d0d4db;border-radius:6px;padding:5px 11px;font-size:12px;cursor:pointer">Siguiente ›</button>
+    <button onclick="tabSemanaHoy()" style="background:#1a4fa0;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer">Semana actual</button>
+  </div>
   <div class="sec-sub" id="tablero-fecha">Cargando...</div>
   <div class="estado-grid" id="estado-grid"></div>
   <div id="cards-grid">
@@ -401,11 +407,57 @@ function buildEventosObra(obra, color){
     +rows+'</div>';
 }
 
+// Semana seleccionada en el tablero (por defecto la actual)
+let tableroWK = null;
+
+// Lista de todas las semanas con relevamiento cargado en cualquier obra + la actual
+function semanasConDatos(){
+  const set=new Set([wkKey()]);
+  OBRAS_CONFIG.forEach(cfg=>{
+    const o=obrasData[cfg.id];
+    if(o&&o.relevamientos) Object.keys(o.relevamientos).forEach(w=>set.add(w));
+  });
+  return Array.from(set).sort();
+}
+
+// fecha del lunes de una clave YYYY-Www
+function lunesDeWk(wk){
+  const m=/^(\d{4})-W(\d{2})$/.exec(wk); if(!m) return null;
+  const y=+m[1], w=+m[2];
+  const ene1=new Date(y,0,1);
+  const lun=new Date(ene1); lun.setDate(ene1.getDate()-((ene1.getDay()+6)%7)+(w-1)*7);
+  return lun;
+}
+function wkLabelLargo(wk){
+  const lun=lunesDeWk(wk); if(!lun) return wk;
+  const dom=new Date(lun); dom.setDate(lun.getDate()+6);
+  const f=d=>d.toLocaleDateString('es-AR',{day:'numeric',month:'short'});
+  const esActual = wk===wkKey();
+  return 'Sem '+wk.split('-W')[1]+' · '+f(lun)+' al '+f(dom)+' '+lun.getFullYear()+(esActual?'  (actual)':'');
+}
+
+function tabSemana(delta){
+  const lista=semanasConDatos();
+  let i=lista.indexOf(tableroWK||wkKey());
+  if(i<0) i=lista.indexOf(wkKey());
+  i=Math.max(0,Math.min(lista.length-1,i+delta));
+  tableroWK=lista[i]; renderTablero();
+}
+function tabSemanaSel(wk){ tableroWK=wk; renderTablero(); }
+function tabSemanaHoy(){ tableroWK=wkKey(); renderTablero(); }
+
 function renderTablero() {
-  const wk = wkKey();
-  const now = new Date();
+  const wk = tableroWK || wkKey();
+  const lista = semanasConDatos();
+  const sel = document.getElementById('tablero-wk-sel');
+  if(sel){
+    sel.innerHTML = lista.slice().reverse().map(w=>
+      '<option value="'+w+'"'+(w===wk?' selected':'')+'>'+wkLabelLargo(w)+'</option>').join('');
+  }
+  const lun = lunesDeWk(wk);
+  const esActual = wk===wkKey();
   document.getElementById('tablero-fecha').textContent =
-    'Semana ' + wk + ' · ' + now.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+    'Mostrando ' + wkLabelLargo(wk).replace('  (actual)','') + (esActual?' — semana en curso':' — semana histórica');
 
   let totalOk=0, totalAtt=0, totalProb=0, totalNR=0;
 
