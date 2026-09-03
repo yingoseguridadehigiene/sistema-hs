@@ -621,21 +621,112 @@ let obra={
 let activeWK=null,chkTarget=null,chkTemp=null,evIdx=null,evType='etapa',editingEv=false;
 
 // -- SUPABASE SAVE/LOAD --
+function _uid(){ return 'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
 function _saveData(){
   try{localStorage.setItem(LS_KEY,JSON.stringify(obra));}catch(e){}
   if(_saveTimer)clearTimeout(_saveTimer);
   _saveTimer=setTimeout(_saveSB,1500);
 }
+// ── FUSIÓN MULTI-DISPOSITIVO ──
+// Antes de subir, se relee la versión remota y se combinan ambos estados,
+// para que dos PC editando la misma obra no se pisen entre sí.
+// - Listas con id (personal, inspecciones, eventos): unión por id; en conflicto gana
+//   el de _mod más reciente; un id presente en remoto y ausente localmente se conserva
+//   salvo que localmente esté marcado como borrado (_del).
+// - Mapas por semana (relevamientos, servicios): por cada semana gana el _mod más reciente.
+// - archivos: unión por path.
+// - Campos sueltos (nombre, fechas, art...): gana el que tenga texto; ante duda, el local.
+function _mergeById(local, remoto, tombs){
+  local=local||[]; remoto=remoto||[];
+  const out=new Map();
+  remoto.forEach(x=>{ if(x&&x.id) out.set(x.id,x); });
+  local.forEach(x=>{
+    if(!x) return;
+    if(!x.id){ out.set('_noid_'+Math.random(), x); return; }
+    const prev=out.get(x.id);
+    if(!prev){ out.set(x.id,x); return; }
+    const a=x._mod||0, b=prev._mod||0;
+    out.set(x.id, a>=b ? x : prev);
+  });
+  // aplicar tombstones (borrados registrados en _tomb): quitar ese id si el borrado
+  // es más reciente que la última edición conservada
+  (tombs||[]).forEach(t=>{
+    if(!t||!t.id) return;
+    const cur=out.get(t.id);
+    if(cur && (cur._mod||0) <= (t._mod||0)) out.delete(t.id);
+    else if(!cur) out.delete(t.id);
+  });
+  return Array.from(out.values()).filter(x=>!x._del);
+}
+function _mergeWeekMap(local, remoto){
+  local=local||{}; remoto=remoto||{};
+  const out=Object.assign({}, remoto);
+  Object.keys(local).forEach(wk=>{
+    const L=local[wk], R=remoto[wk];
+    if(!R){ out[wk]=L; return; }
+    out[wk] = (L&&L._mod||0) >= (R&&R._mod||0) ? L : R;
+  });
+  return out;
+}
+function _mergeArchivos(local, remoto){
+  local=local||[]; remoto=remoto||[];
+  const out=new Map();
+  remoto.forEach(f=>{ if(f) out.set(f.path||f.name, f); });
+  local.forEach(f=>{ if(f) out.set(f.path||f.name, f); });
+  return Array.from(out.values());
+}
+function _mergeTombs(a,b){
+  const map=new Map();
+  (a||[]).concat(b||[]).forEach(t=>{
+    if(!t||!t.id) return;
+    const prev=map.get(t.id);
+    if(!prev||(t._mod||0)>(prev._mod||0)) map.set(t.id,t);
+  });
+  return Array.from(map.values());
+}
+function _mergeObra(localObra, remoto){
+  if(!remoto) return localObra;
+  const m=Object.assign({}, remoto, localObra); // base: campos sueltos, local prioriza
+  const tomb=_mergeTombs(localObra._tomb, remoto._tomb);
+  m._tomb=tomb;
+  m.personal      = _mergeById(localObra.personal,      remoto.personal,     tomb);
+  m.inspecciones  = _mergeById(localObra.inspecciones,  remoto.inspecciones, tomb);
+  m.eventos       = _mergeById(localObra.eventos,       remoto.eventos,      tomb);
+  m.relevamientos = _mergeWeekMap(localObra.relevamientos, remoto.relevamientos);
+  m.servicios     = _mergeWeekMap(localObra.servicios,     remoto.servicios);
+  m.archivos      = _mergeArchivos(localObra.archivos,     remoto.archivos);
+  // campos de texto: preferir no-vacío
+  ['nombre','dir','inicio','fin','do','ao','tecnico','art'].forEach(k=>{
+    if(!localObra[k] && remoto[k]) m[k]=remoto[k];
+  });
+  return m;
+}
+
+let _saving=false, _saveAgain=false;
 async function _saveSB(){
-  const ind=document.getElementById('save-indicator');
+  if(_saving){ _saveAgain=true; return; }
+  _saving=true;
   try{
+    // 1) releer remoto y fusionar
+    try{
+      const rr=await fetch(SB_URL+'/rest/v1/obras_data?id=eq.'+OBRA_ID+'&select=data',{headers:hdrs()});
+      if(rr.ok){
+        const rows=await rr.json();
+        if(rows&&rows.length&&rows[0].data){
+          obra=_mergeObra(obra, rows[0].data);
+          try{localStorage.setItem(LS_KEY,JSON.stringify(obra));}catch(e){}
+        }
+      }
+    }catch(e){/* sin conexión: se sube lo local */}
+
+    // 2) subir el estado fusionado
     const resp=await fetch(SB_URL+'/rest/v1/obras_data?id=eq.'+OBRA_ID,{
       method:'PATCH',
       headers:jhdrs({'Prefer':'return=minimal'}),
       body:JSON.stringify({data:obra,updated_at:new Date().toISOString()})
     });
     if(resp.status===404||resp.status===0){
-      // Try insert
       await fetch(SB_URL+'/rest/v1/obras_data',{
         method:'POST',
         headers:jhdrs({'Prefer':'return=minimal'}),
@@ -643,7 +734,13 @@ async function _saveSB(){
       });
     }
     showSaveOK('* Guardado en la nube');
+    // 3) refrescar vistas por si la fusión trajo datos de otra PC
+    try{renderSB&&renderSB();renderTL&&renderTL();renderPersonalList&&renderPersonalList();}catch(e){}
   }catch(e){showSaveOK('OK Guardado local');}
+  finally{
+    _saving=false;
+    if(_saveAgain){ _saveAgain=false; _saveData(); }
+  }
 }
 async function _loadSB(){
   try{
@@ -659,6 +756,13 @@ async function _loadSB(){
 }
 function loadLocal(){
   try{const raw=localStorage.getItem(LS_KEY);if(raw)obra=Object.assign(obra,JSON.parse(raw));}catch(e){}
+  _asegurarIds();
+}
+// Da id y _mod a registros viejos que no los tengan, para que la fusión los distinga.
+function _asegurarIds(){
+  (obra.personal||[]).forEach(o=>{ if(o&&!o.id){o.id=_uid();o._mod=o._mod||1;} });
+  (obra.inspecciones||[]).forEach(o=>{ if(o&&!o.id){o.id=_uid();o._mod=o._mod||1;} });
+  (obra.eventos||[]).forEach(o=>{ if(o&&!o.id){o.id=_uid();o._mod=o._mod||1;} });
 }
 function showSaveOK(msg){
   const el=document.getElementById('save-indicator');
@@ -1191,6 +1295,7 @@ function catCol(key,rel){
 
 function guardarChk(){
   if(!obra.relevamientos)obra.relevamientos={};
+  chkTemp._mod=Date.now();
   obra.relevamientos[activeWK]=chkTemp;
   closeChk();_saveData();showSaveOK();renderTL();
 }
@@ -1694,13 +1799,16 @@ function removeEppRow(i){eppRows.splice(i,1);renderEppRows();}
 function guardarOperario(){
   const nombre=document.getElementById('op-nombre').value.trim();
   if(!nombre){alert('Ingresá el apellido y nombre del operario.');return;}
+  const prev=(editingOpIdx!==null && obra.personal)?obra.personal[editingOpIdx]:null;
   const op={
+    id:(prev&&prev.id)||_uid(),
     nombre,
     dni:document.getElementById('op-dni').value.trim(),
     puesto:document.getElementById('op-puesto').value.trim(),
     ropa:ropaRows.filter(r=>r.item),
     epp:eppRows.filter(r=>r.item),
-    obs:document.getElementById('op-obs').value
+    obs:document.getElementById('op-obs').value,
+    _mod:Date.now()
   };
   if(!obra.personal)obra.personal=[];
   if(editingOpIdx!==null)obra.personal[editingOpIdx]=op;else obra.personal.push(op);
@@ -1709,6 +1817,8 @@ function guardarOperario(){
 function eliminarOperario(){
   if(editingOpIdx===null)return;
   if(!confirm('¿Eliminar este operario?'))return;
+  const victima=obra.personal[editingOpIdx];
+  if(victima&&victima.id){ obra._tomb=(obra._tomb||[]); obra._tomb.push({id:victima.id,_del:true,_mod:Date.now()}); }
   obra.personal.splice(editingOpIdx,1);
   closeOperarioForm();renderPersonalList();renderSrvSB();_saveData();showSaveOK();
 }
