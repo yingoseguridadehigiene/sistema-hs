@@ -128,6 +128,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 .btn-sm.btn-green{background:#1a6b2e;color:#fff}
 .btn-sm.btn-gray{background:#e8eaf0;color:#444}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div id="auth-gate" style="position:fixed;inset:0;background:#1a2332;z-index:9999;display:flex;align-items:center;justify-content:center">
@@ -1085,7 +1086,7 @@ function renderWT(){
       <div class="wtc" style="cursor:pointer" onclick="openEvModal(null,'cap')" title="Clic para agregar capacitacion">${chip(caW,'cap')}<span style="font-size:9px;color:#1a6b2e;display:block;margin-top:2px">+ agregar</span></div>
       <div class="wtc" style="cursor:pointer" onclick="openInspFromWeek('${wkKey(wk)}')" title="Clic para abrir/editar inspección de esta semana">${chip(inW,'insp')}</div>
       <div class="wtc-btn"><button class="btn-abrir" style="${btnStyle}" onclick="openChk('${wkKey(wk)}')">Abrir</button></div>
-      <div class="wtc" style="cursor:pointer" onclick="openDocsModal('${wkKey(wk)}')" title="Ver/subir documentos">
+      <div class="wtc-btn" title="Ver/subir documentos de esta semana">
         ${buildDocsChip(wkKey(wk))}
       </div>
     </div>`;
@@ -1105,8 +1106,8 @@ function renderWT(){
       <div class="wth hd-etapa">🏗 Etapas</div>
       <div class="wth hd-cap">📚 Capac.</div>
       <div class="wth hd-insp">🔍 Inspec.</div>
-      <div class="wth">Tablero</div>
-      <div class="wth">📎 Docs</div>
+      <div class="wth">📋 Reporte semanal</div>
+      <div class="wth">📎 Documentos</div>
     </div>
     <div class="wt-scroll">
       ${rows}
@@ -2130,6 +2131,111 @@ function guardarInsp(){
   if(ei>=0) obra.eventos[ei]=evData; else obra.eventos.push(evData);
   closeInspModal();
   _saveData();showSaveOK();renderTL();
+  // Genera y adjunta el PDF de la inspección a los documentos de la semana
+  try{ generarPDFInspeccion(insp); }catch(e){ console.warn('PDF inspección:',e); }
+}
+
+// ── PDF DE INSPECCIÓN → DOCS DE LA SEMANA ──
+function _inspPDFDoc(insp){
+  var jsPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : (window.jsPDF||null);
+  if(!jsPDF) throw new Error('jsPDF no disponible');
+  var doc = new jsPDF({unit:'mm', format:'a4'});
+  var W = 210, M = 15, y = 18;
+  function fecha(f){ if(!f)return''; var p=(''+f).split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:f; }
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text('INSPECCIÓN DE HIGIENE Y SEGURIDAD', W/2, y, {align:'center'}); y+=6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text('Ley 19.587 · Decreto 911/96 · Res. 51/97 · Res. 61/23', W/2, y, {align:'center'}); y+=8;
+
+  doc.setDrawColor(180); doc.line(M,y,W-M,y); y+=6;
+  doc.setFontSize(10);
+  doc.setFont('helvetica','bold'); doc.text('Obra:', M, y);
+  doc.setFont('helvetica','normal'); doc.text(String(obra.nombre||OBRA_ID), M+18, y);
+  doc.setFont('helvetica','bold'); doc.text('Fecha:', W-M-45, y);
+  doc.setFont('helvetica','normal'); doc.text(fecha(insp.inicio), W-M-30, y); y+=5.5;
+  doc.setFont('helvetica','bold'); doc.text('Inspector:', M, y);
+  doc.setFont('helvetica','normal'); doc.text(String(insp.inspector||'-'), M+18, y);
+  if(obra.art){ doc.setFont('helvetica','bold'); doc.text('ART:', W-M-45, y);
+    doc.setFont('helvetica','normal'); doc.text(String(obra.art), W-M-35, y); }
+  y+=8;
+
+  var cats = insp.cats||{};
+  var estColor = {'Falta':[192,57,43],'Pedido':[214,137,16],'Con Restricción':[180,120,10],'OK':[26,107,46]};
+  Object.keys(cats).forEach(function(cat){
+    var items = cats[cat]||[];
+    if(!items.length) return;
+    if(y>270){ doc.addPage(); y=18; }
+    doc.setFillColor(238,242,248); doc.rect(M,y-4,W-2*M,6,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(10);
+    doc.setTextColor(26,79,160); doc.text(cat, M+2, y); y+=6;
+    doc.setTextColor(30,30,30);
+    items.forEach(function(it){
+      if(y>282){ doc.addPage(); y=18; }
+      doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      var est = it.estado||'';
+      var c = estColor[est]||[90,90,90];
+      doc.setTextColor(c[0],c[1],c[2]); doc.setFont('helvetica','bold');
+      doc.text(est?('['+est+']'):'[ - ]', M+2, y);
+      doc.setTextColor(30,30,30); doc.setFont('helvetica','normal');
+      var txt = doc.splitTextToSize(String(it.desc||''), W-2*M-32);
+      doc.text(txt, M+30, y);
+      y += Math.max(5, txt.length*4.5);
+    });
+    y+=3;
+  });
+
+  if(insp.obs){
+    if(y>265){ doc.addPage(); y=18; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(30,30,30);
+    doc.text('Observaciones generales', M, y); y+=5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    var o = doc.splitTextToSize(String(insp.obs), W-2*M);
+    doc.text(o, M, y); y+=o.length*4.5+6;
+  }
+
+  if(y>255){ doc.addPage(); y=250; } else { y=Math.max(y,255); }
+  doc.setDrawColor(120);
+  doc.line(M, y+18, M+60, y+18);
+  doc.line(W-M-60, y+18, W-M, y+18);
+  doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('Responsable de Higiene y Seguridad', M, y+22);
+  doc.text('Firma y sello', W-M-60, y+22);
+  doc.setTextColor(150); doc.setFontSize(7);
+  doc.text('Generado automáticamente por el Sistema HyS — '+new Date().toLocaleString('es-AR'), M, 292);
+
+  return doc;
+}
+
+function generarPDFInspeccion(insp){
+  var doc = _inspPDFDoc(insp);
+  var blob = doc.output('blob');
+  var wk = wkKey(insp.inicio);
+  var fname = 'Inspeccion_HyS_'+(insp.inicio||'')+'.pdf';
+  var path = OBRA_ID + '/' + wk + '/insp_' + Date.now() + '_' + fname;
+
+  // subir a Storage
+  fetch(SB_STORAGE_URL + '/object/' + BUCKET + '/' + path, {
+    method:'POST', headers: hdrs({ 'Content-Type':'application/pdf', 'x-upsert':'true' }), body: blob
+  }).then(function(r){
+    if(!r.ok) throw new Error('No se pudo subir el PDF de la inspección');
+    if(!obra.docs) obra.docs={};
+    if(!obra.docs[wk]) obra.docs[wk]=[];
+    // reemplazar PDF de inspección anterior de la MISMA semana (evita acumular al re-guardar)
+    obra.docs[wk] = obra.docs[wk].filter(function(d){
+      var esInsp = d.auto==='insp';
+      if(esInsp && d.path){ fetch(SB_STORAGE_URL+'/object/'+BUCKET+'/'+d.path,{method:'DELETE',headers:hdrs()}); }
+      return !esInsp;
+    });
+    obra.docs[wk].push({ name:fname, path:path, type:'application/pdf', auto:'insp',
+      fecha:new Date().toLocaleDateString('es-AR') });
+    _saveData();
+    try{ renderWT&&renderWT(); }catch(e){}
+    showSaveOK('* Inspección guardada + PDF en Docs');
+  }).catch(function(e){
+    console.warn('PDF inspección no subido:', e);
+    showSaveOK('OK Inspección guardada (PDF no subido)');
+  });
 }
 
 function eliminarInsp(){
@@ -2175,8 +2281,10 @@ const BUCKET = 'obras-docs';
 
 function buildDocsChip(wk) {
   var docs = (obra.docs || {})[wk] || [];
-  if (!docs.length) return '<span style="font-size:9px;color:#bbb">Sin docs</span>';
-  return '<span style="font-size:9px;color:#1a4fa0;font-weight:700">' + docs.length + ' doc' + (docs.length > 1 ? 's' : '') + '</span>';
+  var n = docs.length;
+  var badge = n ? '<span style="background:#1a4fa0;color:#fff;border-radius:9px;padding:0 5px;font-size:8px;font-weight:700;margin-left:4px">'+n+'</span>' : '';
+  return '<button class="btn-abrir" style="background:#eef4fd;color:#1a4fa0;border:1px solid #b8cde8" '
+       + 'onclick="openDocsModal(\''+wk+'\')">📎 Documentos'+badge+'</button>';
 }
 
 function openDocsModal(wk) {
@@ -2206,7 +2314,7 @@ function renderDocsList() {
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f2f6">'
       + '<span style="font-size:18px">' + icon + '</span>'
       + '<div style="flex:1">'
-      + '<div style="font-size:11px;font-weight:600;color:#1a2332">' + doc.name + '</div>'
+      + '<div style="font-size:11px;font-weight:600;color:#1a2332">' + doc.name + (doc.auto==='insp'?' <span style="font-size:8px;background:#eef4fd;color:#1a4fa0;border-radius:4px;padding:1px 5px;font-weight:700">AUTO · Inspección</span>':'') + '</div>'
       + '<div style="font-size:9px;color:#888">' + (doc.fecha || '') + '</div>'
       + '</div>'
       + '<button onclick="verDoc(' + i + ')" style="font-size:10px;color:#1a4fa0;background:#fff;text-decoration:none;padding:3px 8px;border:1px solid #1a4fa0;border-radius:4px;cursor:pointer">Ver</button>'
