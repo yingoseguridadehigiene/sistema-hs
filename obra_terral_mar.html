@@ -2017,14 +2017,55 @@ function toggleEvResultado(){
 const INSP_CATS = [
   'Documentación HyS',
   'Documentación Laboral',
+  'General',
+  'Servicios',
   'Maquinaria y Equipos',
   'Instalación Eléctrica',
   'EPP y Vestimenta',
+  'Seguridad Perimetral',
   'Trabajos en Altura',
   'Orden y Limpieza',
-  'Servicios',
-  'Seguridad Perimetral',
 ];
+
+// Ítems fijos que precargan cada categoría al abrir una inspección nueva.
+// Las categorías sin lista (o vacías) arrancan con un renglón en blanco.
+const INSP_ITEMS_FIJOS = {
+  'Documentación HyS': [
+    'Inicio de obra','Programa de seguridad','Doc. Lic. y Téc. HyS','Planilla 299/11',
+    'Capacitaciones','Rol de emergencia para accidentes','Permiso de trabajo',
+    'Análisis de Trabajo Seguro (ATS)','Cálculo andamios / montacargas',
+    'Seguro de responsabilidad civil','Documentación de maquinarias','Check list',
+    'Documentación de subcontratista'
+  ],
+  'Documentación Laboral': [
+    'Nómina general y por rubros','Seguro de accidente personal','Nómina de ART',
+    'Alta temprana','Pre-ocupacionales','Constancia de inscripción AFIP',
+    'Constancia de inscripción monotributo','Constancia de pago monotributo','Contratos'
+  ],
+  'Servicios': [
+    'Baño químico','Limpieza de baño químico','Dispenser','Bidones de agua',
+    'Internet','Alarma','Cámaras de seguridad'
+  ],
+  'General': [
+    'Extintor','Chapabaliza','Botiquín de primeros auxilios','Cartelería HyS/ART',
+    'Tablero eléctrico','Puesta a tierra','Elementos de izaje','Andamios',
+    'Reflectores','Protección en máquinas'
+  ],
+  'Maquinaria y Equipos': [
+    'Generador eléctrico','Vibradores','Andamios','Trompo',
+    'Puntales telescópicos','Guinche eléctrico'
+  ],
+  'Instalación Eléctrica': [
+    'Tablero de obra','Jabalina','Cables elevados','Cables con empalmes cubiertos'
+  ],
+  'EPP y Vestimenta': [
+    'Pantalón','Camisa','Botín'
+  ],
+  'Seguridad Perimetral': [
+    'Barandas en pozos de excavación','Barandas filo de losa','Barandas de escaleras',
+    'Protección de huecos pase de losa','Escalera de acceso','Protección en pelos de hierro'
+  ],
+};
 
 let inspIdx = null;
 let inspCatItems = {};
@@ -2044,7 +2085,14 @@ function openInspModal(idx){
   inspCatItems = {};
   INSP_CATS.forEach(function(cat){
     var saved = insp && insp.cats && insp.cats[cat] ? insp.cats[cat] : [];
-    inspCatItems[cat] = saved.length ? JSON.parse(JSON.stringify(saved)) : [{desc:'',estado:''}];
+    if(saved.length){
+      inspCatItems[cat] = JSON.parse(JSON.stringify(saved));
+    } else {
+      var fijos = INSP_ITEMS_FIJOS[cat];
+      inspCatItems[cat] = fijos && fijos.length
+        ? fijos.map(function(d){ return {desc:d, estado:''}; })
+        : [{desc:'',estado:''}];
+    }
   });
   renderInspCats();
   document.getElementById('insp-modal').classList.add('open');
@@ -2066,9 +2114,10 @@ function renderInspCats(){
       html += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px" data-cat="' + cat + '" data-i="' + i + '">';
       html += '<input type="text" class="insp-item-desc" data-cat="' + cat + '" data-i="' + i + '" value="' + (it.desc||'').replace(/"/g,'&quot;') + '" placeholder="Describir ítem..." style="flex:1;border:1px solid #d0d4db;border-radius:5px;padding:5px 8px;font-size:11px">';
       html += '<div style="display:flex;gap:3px">';
-      ['Falta','Pedido','Con Restricción'].forEach(function(est){
+      ['Cumple','Falta','Pedido','Con Restricción'].forEach(function(est){
         var active = it.estado === est;
-        html += '<button type="button" class="insp-est-btn" data-cat="' + cat + '" data-i="' + i + '" data-est="' + est + '" style="font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;border:1px solid ' + (active?'#1a4fa0':'#d0d4db') + ';background:' + (active?'#1a4fa0':'#fff') + ';color:' + (active?'#fff':'#555') + '">' + est + '</button>';
+        var okCol = est==='Cumple' ? '#1a6b2e' : '#1a4fa0';
+        html += '<button type="button" class="insp-est-btn" data-cat="' + cat + '" data-i="' + i + '" data-est="' + est + '" style="font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;border:1px solid ' + (active?okCol:'#d0d4db') + ';background:' + (active?okCol:'#fff') + ';color:' + (active?'#fff':'#555') + '">' + est + '</button>';
       });
       html += '</div>';
       html += '<button type="button" class="insp-remove-btn" data-cat="' + cat + '" data-i="' + i + '" style="background:#fde8e8;color:#c0392b;border:none;border-radius:4px;width:22px;height:22px;cursor:pointer;font-size:13px;line-height:1">x</button>';
@@ -2161,7 +2210,7 @@ function _inspPDFDoc(insp){
   y+=8;
 
   var cats = insp.cats||{};
-  var estColor = {'Falta':[192,57,43],'Pedido':[214,137,16],'Con Restricción':[180,120,10],'OK':[26,107,46]};
+  var estColor = {'Cumple':[26,107,46],'Falta':[192,57,43],'Pedido':[214,137,16],'Con Restricción':[180,120,10],'OK':[26,107,46]};
   Object.keys(cats).forEach(function(cat){
     var items = cats[cat]||[];
     if(!items.length) return;
