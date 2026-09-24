@@ -129,6 +129,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 .btn-sm.btn-gray{background:#e8eaf0;color:#444}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="formularios.js"></script>
 </head>
 <body>
 <div id="auth-gate" style="position:fixed;inset:0;background:#1a2332;z-index:9999;display:flex;align-items:center;justify-content:center">
@@ -228,6 +229,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
     <span class="tb-sub" id="tb-dates"></span>
     <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn-sm btn-blue" id="btn-ps" onclick="openDocFijo('ps')">📄 Prog. Seguridad</button>
+      <button class="btn-sm" style="background:#0e7c86;color:#fff" onclick="openFormularios()">📋 Formularios</button>
       <button class="btn-sm" style="background:#c0392b;color:#fff" id="btn-plan" onclick="openDocFijo('plan')">📐 Plan de trabajo</button>
       <button class="btn-sm btn-green" onclick="openInspModal(null)">Inspección HyS</button>
       <button class="btn-sm" style="background:#856404;color:#fff" onclick="openImportJSON()">📋 Pegar análisis</button>
@@ -489,6 +491,17 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 </div>
 
 <!-- DOCUMENTOS MODAL -->
+<div class="modal-bg" id="formularios-modal">
+  <div class="modal" style="width:540px;max-height:88vh">
+    <div class="mhd">
+      <div><h3>📋 Formularios</h3><div class="mhd-sub">Plantillas para descargar, imprimir y completar en obra</div></div>
+      <button class="mx" onclick="closeFormularios()">x</button>
+    </div>
+    <div class="mbody" id="formularios-list"></div>
+    <div class="mfoot"><button class="btn-cancel" onclick="closeFormularios()">Cerrar</button></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="docfijo-modal">
   <div class="modal" style="width:520px">
     <div class="mhd">
@@ -1436,6 +1449,26 @@ function imprimirConstancia(idx){
   if(!w){ alert('El navegador bloqueó la ventana emergente. Permitila para imprimir la constancia.'); return; }
   w.document.open(); w.document.write(html); w.document.close();
 }
+
+// -- FORMULARIOS (plantillas fijas, iguales para todas las obras) --
+// Los archivos viven en la carpeta /formularios del repositorio.
+
+function openFormularios(){
+  var wrap=document.getElementById('formularios-list');
+  wrap.innerHTML = FORMULARIOS.map(function(f){
+    var links=f.archivos.map(function(a){
+      return '<a href="'+a.file+'" download style="display:inline-flex;align-items:center;gap:5px;'
+        + 'font-size:11px;color:#0e7c86;background:#e6f4f5;border:1px solid #b6dde0;border-radius:5px;'
+        + 'padding:5px 10px;text-decoration:none;margin-right:6px">'+a.icon+' '+a.label+' &darr;</a>';
+    }).join('');
+    return '<div style="border:1px solid #e8eaf0;border-radius:8px;padding:11px 13px;margin-bottom:9px">'
+      + '<div style="font-size:12px;font-weight:700;color:#1a2332;margin-bottom:7px">'+f.titulo+'</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:4px">'+links+'</div>'
+      + '</div>';
+  }).join('');
+  document.getElementById('formularios-modal').classList.add('open');
+}
+function closeFormularios(){ document.getElementById('formularios-modal').classList.remove('open'); }
 
 // -- DOCUMENTOS FIJOS (Prog. Seguridad / Plan de trabajo) --
 const DF_META = {
@@ -2469,6 +2502,7 @@ function subirDoc() {
 
 document.getElementById('docs-modal').addEventListener('click', function(e) { if (e.target === this) closeDocsModal(); });
 document.getElementById('docfijo-modal').addEventListener('click', function(e) { if (e.target === this) closeDocFijo(); });
+document.getElementById('formularios-modal').addEventListener('click', function(e){ if(e.target===this) closeFormularios(); });
 
 // -- INIT --
 let _booted=false;
