@@ -14,5 +14,11 @@ const FORMULARIOS = [
   { titulo:'Permiso de trabajo en altura', archivos:[
       {label:'PDF para imprimir', file:'formularios/Permiso%20de%20trabajo%20en%20Altura.pdf', icon:'📄'} ] },
   { titulo:'Permiso de trabajo en caliente', archivos:[
-      {label:'PDF para imprimir', file:'formularios/Permiso%20de%20trabajo%20en%20caliente.pdf', icon:'📄'} ] }
+      {label:'PDF para imprimir', file:'formularios/Permiso%20de%20trabajo%20en%20caliente.pdf', icon:'📄'} ] },
+  { titulo:'Planilla Res. 299/11 (entrega de EPP)', archivos:[
+      {label:'PDF para imprimir', file:'formularios/Planilla_299-11.pdf', icon:'📄'} ] },
+  { titulo:'RGRL — Relevamiento General de Riesgos Laborales', archivos:[
+      {label:'RGRL Dec. 911/96 (construcción)', file:'formularios/RGRL_911-96.pdf', icon:'📄'},
+      {label:'RGRL Dec. 351/79',                file:'formularios/RGRL_351.pdf', icon:'📄'},
+      {label:'Instructivo de carga',            file:'formularios/Explicacion_carga_RGRL.pdf', icon:'📘'} ] }
 ];
