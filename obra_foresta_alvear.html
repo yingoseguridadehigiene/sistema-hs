@@ -129,7 +129,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;display:flex;height:100vh;overflow:
 .btn-sm.btn-gray{background:#e8eaf0;color:#444}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="formularios.js?v=3"></script>
 </head>
 <body>
 <div id="auth-gate" style="position:fixed;inset:0;background:#1a2332;z-index:9999;display:flex;align-items:center;justify-content:center">
@@ -1447,9 +1446,11 @@ function imprimirConstancia(idx){
 // -- FORMULARIOS (plantillas fijas, iguales para todas las obras) --
 // Los archivos viven en la carpeta /formularios del repositorio.
 
-function openFormularios(){
+function _renderFormularios(){
   var wrap=document.getElementById('formularios-list');
-  wrap.innerHTML = FORMULARIOS.map(function(f){
+  var lista=(window.FORMULARIOS||[]);
+  if(!lista.length){ wrap.innerHTML='<div style="padding:12px;color:#c0392b;font-size:12px">No se pudo cargar la lista de formularios.</div>'; return; }
+  wrap.innerHTML = lista.map(function(f){
     var links=f.archivos.map(function(a){
       return '<a href="'+a.file+'" download style="display:inline-flex;align-items:center;gap:5px;'
         + 'font-size:11px;color:#0e7c86;background:#e6f4f5;border:1px solid #b6dde0;border-radius:5px;'
@@ -1460,7 +1461,17 @@ function openFormularios(){
       + '<div style="display:flex;flex-wrap:wrap;gap:4px">'+links+'</div>'
       + '</div>';
   }).join('');
+}
+function openFormularios(){
+  var wrap=document.getElementById('formularios-list');
+  wrap.innerHTML='<div style="padding:12px;color:#888;font-size:12px">Cargando formularios&hellip;</div>';
   document.getElementById('formularios-modal').classList.add('open');
+  // Carga la lista SIEMPRE fresca (marca de tiempo evita el caché del navegador).
+  var s=document.createElement('script');
+  s.src='formularios.js?t='+Date.now();
+  s.onload=function(){ _renderFormularios(); };
+  s.onerror=function(){ document.getElementById('formularios-list').innerHTML='<div style="padding:12px;color:#c0392b;font-size:12px">No se pudo cargar la lista de formularios. Revis&aacute; la conexi&oacute;n.</div>'; };
+  document.head.appendChild(s);
 }
 function closeFormularios(){ document.getElementById('formularios-modal').classList.remove('open'); }
 
