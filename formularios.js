@@ -24,5 +24,5 @@ window.FORMULARIOS = [
   { titulo:'Nota de deslinde de responsabilidad (Acc. Personales)', archivos:[
       {label:'PDF para imprimir', file:'formularios/Nota_Deslinde_Responsabilidad_AP.pdf', icon:'📄'} ] },
   { titulo:'Nota de primeros auxilios', archivos:[
-      {label:'PDF para imprimir', file:'formularios/Nota_de_Primeros_Auxilios.pdf', icon:'📄'} ] }
+      {label:'PDF para imprimir', file:'formularios/Primeros_Auxilios_Obra_BuenosAires.pdf', icon:'📄'} ] }
 ];
