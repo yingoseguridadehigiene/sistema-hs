@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pañol · Yingo S.A.</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#f3f4f1; --card:#fff; --ink:#1d2321; --muted:#68716d; --line:#dfe2de;
+  --head:#22302b; --acc:#e8730c; --acc2:#c95f04;
+  --ok:#1f8a4c; --okbg:#e3f4ea; --info:#1d5fa8; --infobg:#e3edf9;
+  --warn:#a86b00; --warnbg:#fdf1d8; --bad:#b3261e; --badbg:#fbe4e2; --grey:#5b6360; --greybg:#eceeec;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit}
+header{background:var(--head);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+header h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.2px}
+header h1 span{color:var(--acc)}
+.live{display:flex;align-items:center;gap:6px;font-size:12px;opacity:.85}
+.dot{width:8px;height:8px;border-radius:50%;background:#999}
+.dot.on{background:#3ddc84;box-shadow:0 0 0 3px rgba(61,220,132,.25)}
+.who{margin-left:auto;font-size:13px;display:flex;gap:8px;align-items:center}
+.who button{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer}
+nav{display:flex;gap:4px;padding:8px 16px 0;overflow-x:auto;background:var(--head)}
+nav button{background:transparent;color:#cfd6d3;border:0;padding:9px 12px;border-radius:8px 8px 0 0;cursor:pointer;white-space:nowrap;font-weight:550}
+nav button.on{background:var(--bg);color:var(--ink)}
+main{max-width:1180px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer}
+.kpi b{display:block;font-size:24px;line-height:1.1}
+.kpi small{color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.row>*{flex:1 1 160px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
+textarea{min-height:60px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:-1px;border-color:transparent}
+.btn{background:var(--acc);color:#fff;border:0;border-radius:7px;padding:9px 14px;font-weight:650;cursor:pointer}
+.btn:hover{background:var(--acc2)}
+.btn.sec{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.seg button{border:0;background:transparent;padding:7px 14px;cursor:pointer;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--head);color:#fff}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{text-align:left;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--line);padding:7px 8px;white-space:nowrap}
+.tbl td{border-bottom:1px solid var(--line);padding:8px;vertical-align:top}
+.tbl tr.click{cursor:pointer}
+.tbl tr.click:hover td{background:#fafaf8}
+.scroll{overflow-x:auto}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:650;white-space:nowrap}
+.p-disponible,.p-ok,.p-reparada{background:var(--okbg);color:var(--ok)}
+.p-en_obra,.p-en_reparacion,.p-info{background:var(--infobg);color:var(--info)}
+.p-fuera_servicio,.p-abierta,.p-warn,.p-con_falla{background:var(--warnbg);color:var(--warn)}
+.p-extraviada,.p-irreparable,.p-bad{background:var(--badbg);color:var(--bad)}
+.p-baja,.p-cerrada{background:var(--greybg);color:var(--grey)}
+.muted{color:var(--muted)}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.empty{color:var(--muted);text-align:center;padding:24px}
+.items{border:1px dashed var(--line);border-radius:8px;padding:8px;margin-top:10px}
+.item{display:grid;grid-template-columns:1fr auto;gap:8px;padding:8px;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .x{background:none;border:0;color:var(--bad);font-size:20px;cursor:pointer;line-height:1}
+.item .sub{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.item .sub>*{flex:1 1 130px}
+.pick{max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:6px}
+.pick div{padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.pick div:hover{background:#fff6ee}
+.tl{list-style:none;margin:0;padding:0;border-left:2px solid var(--line);margin-left:6px}
+.tl li{position:relative;padding:0 0 14px 16px}
+.tl li::before{content:"";position:absolute;left:-7px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--info);border:2px solid #fff}
+.tl li.falla::before{background:var(--warn)}
+.tl li.reparacion::before{background:var(--ok)}
+.tl .t{font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;display:none;z-index:50;max-width:calc(100% - 32px)}
+#toast.err{background:var(--bad)}
+.modal{position:fixed;inset:0;background:rgba(20,26,24,.5);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:40;overflow:auto}
+.modal>div{background:#fff;border-radius:12px;padding:18px;width:100%;max-width:560px}
+#login{position:fixed;inset:0;background:var(--head);display:flex;align-items:center;justify-content:center;padding:16px;z-index:60}
+#login .card{width:100%;max-width:360px}
+.remito{border:1px solid var(--ink);padding:16px;font-size:13px}
+.remito h3{margin:0 0 4px}
+.remito .firmas{display:flex;gap:30px;margin-top:40px}
+.remito .firmas div{flex:1;border-top:1px solid var(--ink);text-align:center;padding-top:4px}
+@media print{
+  body *{visibility:hidden}
+  #printArea,#printArea *{visibility:visible}
+  #printArea{position:absolute;left:0;top:0;width:100%}
+}
+@media (max-width:640px){
+  .hide-sm{display:none}
+  main{padding:12px}
+}
+</style>
+</head>
+<body>
+
+<div id="login" style="display:none">
+  <div class="card">
+    <h2>Pañol · Yingo S.A.</h2>
+    <p class="muted" style="margin-top:0">Ingresá con tu usuario del sistema.</p>
+    <label>Email</label><input id="lgEmail" type="email" autocomplete="username">
+    <div style="height:8px"></div>
+    <label>Contraseña</label><input id="lgPass" type="password" autocomplete="current-password">
+    <div style="height:12px"></div>
+    <button class="btn" style="width:100%" onclick="doLogin()">Ingresar</button>
+    <p id="lgErr" style="color:var(--bad);font-size:13px"></p>
+  </div>
+</div>
+
+<header>
+  <h1>Pañol <span>·</span> Depósito</h1>
+  <div class="live"><span class="dot" id="liveDot"></span><span id="liveTxt">conectando…</span></div>
+  <div class="who"><span id="whoTxt"></span><button onclick="doLogout()">Salir</button></div>
+</header>
+<nav id="nav"></nav>
+<main id="main"><div class="empty">Cargando…</div></main>
+<div id="toast"></div>
+<div id="modalHost"></div>
+
+<script>
+/* =====================================================================
+   CONFIGURACIÓN — usar los mismos datos del sistema HyS
+   (Supabase > Project Settings > API)
+   ===================================================================== */
+const SUPABASE_URL = 'https://TU-PROYECTO.supabase.co';
+const SUPABASE_ANON_KEY = 'TU-ANON-KEY';
+/* ===================================================================== */
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const S = {
+  user: null, perfil: null,
+  ubic: [], personas: [], herr: [], mats: [], stock: [], fallas: [],
+  tab: 'stock', stockView: 'herr',
+  f: { q: '', ubic: '', estado: '' },
+  mov: null, hist: null, fallaFiltro: 'pendientes', lastSync: null
+};
+
+const TIPOS = {
+  salida:            { lbl: 'Salida a obra',          o: ['deposito'], d: ['obra'],            herr: true,  mat: true,  persona: 'Quién retira' },
+  devolucion:        { lbl: 'Devolución al depósito', o: ['obra'],     d: ['deposito'],        herr: true,  mat: true,  persona: 'Quién devuelve' },
+  transferencia:     { lbl: 'Transferencia obra→obra',o: ['obra'],     d: ['obra'],            herr: true,  mat: true,  persona: 'Quién retira' },
+  consumo:           { lbl: 'Consumo en obra',        o: ['obra','deposito'], d: null,         herr: false, mat: true,  persona: 'Responsable' },
+  ingreso:           { lbl: 'Ingreso (compra)',       o: null,         d: ['deposito','obra'], herr: false, mat: true,  persona: 'Recibe' },
+  envio_reparacion:  { lbl: 'Envío a reparación',     o: ['deposito','obra'], d: ['taller'],   herr: true,  mat: false, persona: 'Lleva' },
+  retorno_reparacion:{ lbl: 'Retorno de reparación',  o: ['taller'],   d: ['deposito','obra'], herr: true,  mat: false, persona: 'Trae' },
+  baja:              { lbl: 'Baja definitiva',        o: ['deposito','obra','taller'], d: null,herr: true,  mat: true,  persona: 'Autoriza' }
+};
+const EST_H = { disponible:'Disponible', en_obra:'En obra', en_reparacion:'En reparación', fuera_servicio:'Fuera de servicio', extraviada:'Extraviada', baja:'Baja' };
+const EST_F = { abierta:'Abierta', en_reparacion:'En reparación', reparada:'Reparada', irreparable:'Irreparable', cerrada:'Cerrada' };
+const TFALLA = { desgaste:'Desgaste', rotura:'Rotura', mal_uso:'Mal uso', defecto_fabrica:'Defecto de fábrica', extravio:'Extravío', robo:'Robo', otro:'Otro' };
+const EV = { ingreso:'Ingreso', salida:'Salida a obra', devolucion:'Devolución', transferencia:'Transferencia', consumo:'Consumo', envio_reparacion:'Enviada a reparar', retorno_reparacion:'Volvió de reparación', baja:'Baja' };
+
+/* ---------- utilidades ---------- */
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rol = () => S.perfil?.rol || 'consulta';
+const canWrite = () => ['admin','panolero'].includes(rol());
+const canReport = () => ['admin','panolero','jefe_obra'].includes(rol());
+const U = id => S.ubic.find(u => u.id === id);
+const nU = id => U(id)?.nombre || '—';
+const nP = id => S.personas.find(p => p.id === id)?.nombre || '—';
+const H = id => S.herr.find(h => h.id === id);
+const M = id => S.mats.find(m => m.id === id);
+const fmtN = n => Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 });
+const fmtD = d => d ? new Date(d).toLocaleDateString('es-AR') : '—';
+const fmtDT = d => d ? new Date(d).toLocaleString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—';
+const fmtDay = d => d ? d.split('-').reverse().join('/') : '—';   // 'YYYY-MM-DD' sin conversión horaria
+const days = d => d ? Math.floor((Date.now() - new Date(d)) / 86400000) : null;
+const pill = (k, txt) => `<span class="pill p-${esc(k)}">${esc(txt ?? k)}</span>`;
+const todayISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const nowLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+const ubicOpts = (tipos, sel, blank = '— elegir —') =>
+  `<option value="">${blank}</option>` + S.ubic.filter(u => u.activa && (!tipos || tipos.includes(u.tipo)))
+    .map(u => `<option value="${u.id}" ${u.id === sel ? 'selected' : ''}>${esc(u.nombre)}${tipos && tipos.length > 1 ? ' (' + u.tipo + ')' : ''}</option>`).join('');
+const persOpts = sel => `<option value="">— elegir —</option>` + S.personas.filter(p => p.activo)
+    .map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.nombre)}${p.empresa && p.empresa !== 'Yingo S.A.' ? ' · ' + esc(p.empresa) : ''}</option>`).join('');
+
+function toast(msg, err) {
+  const t = $('toast'); t.textContent = msg; t.className = err ? 'err' : ''; t.style.display = 'block';
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', err ? 6000 : 3000);
+}
+function modal(html) { $('modalHost').innerHTML = `<div class="modal" onclick="if(event.target===this)closeModal()"><div>${html}</div></div>`; }
+function closeModal() { $('modalHost').innerHTML = ''; }
+function friendly(e) { return (e?.message || String(e)).replace(/^.*?ERROR:\s*/, ''); }
+
+/* ---------- sesión ---------- */
+async function init() {
+  const { data } = await sb.auth.getSession();
+  if (!data.session) { $('login').style.display = 'flex'; return; }
+  S.user = data.session.user;
+  await boot();
+}
+async function doLogin() {
+  $('lgErr').textContent = '';
+  const { data, error } = await sb.auth.signInWithPassword({ email: $('lgEmail').value.trim(), password: $('lgPass').value });
+  if (error) { $('lgErr').textContent = 'No se pudo ingresar: ' + error.message; return; }
+  S.user = data.user; $('login').style.display = 'none'; await boot();
+}
+async function doLogout() { await sb.auth.signOut(); location.reload(); }
+
+async function boot() {
+  const { data: perfil } = await sb.from('pn_perfiles').select('*').eq('user_id', S.user.id).maybeSingle();
+  S.perfil = perfil || { rol: 'consulta', nombre: S.user.email };
+  $('whoTxt').innerHTML = `${esc(S.perfil.nombre)} · ${pill('info', rol())}`;
+  if (rol() === 'jefe_obra' && S.perfil.ubicacion_id) S.f.ubic = S.perfil.ubicacion_id;
+  await loadAll();
+  render();
+  subscribe();
+}
+
+async function loadAll() {
+  const [u, p, h, m, s, f] = await Promise.all([
+    sb.from('pn_ubicaciones').select('*').order('tipo').order('nombre'),
+    sb.from('pn_personas').select('*').order('nombre'),
+    sb.from('v_pn_herramientas').select('*').order('codigo'),
+    sb.from('pn_materiales').select('*').order('nombre'),
+    sb.from('pn_stock_materiales').select('*'),
+    sb.from('pn_fallas').select('*').order('fecha_falla', { ascending: false }).limit(1000)
+  ]);
+  const err = [u, p, h, m, s, f].find(r => r.error);
+  if (err) { toast('Error cargando datos: ' + err.error.message + ' — ¿corriste panol_schema.sql?', true); }
+  S.ubic = u.data || []; S.personas = p.data || []; S.herr = h.data || [];
+  S.mats = m.data || []; S.stock = s.data || []; S.fallas = f.data || [];
+  S.lastSync = new Date();
+}
+
+let reloadTimer = null;
+function subscribe() {
+  const onChange = () => {
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(async () => {
+      await loadAll();
+      // no pisar un formulario a medio cargar
+      if (S.tab !== 'mov' && !$('modalHost').innerHTML && !(S.tab === 'catalogo')) render();
+      else toast('Stock actualizado por otro usuario');
+      $('liveTxt').textContent = 'en vivo · ' + S.lastSync.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    }, 500);
+  };
+  const ch = sb.channel('panol-live');
+  ['pn_herramientas', 'pn_stock_materiales', 'pn_movimientos', 'pn_fallas'].forEach(t =>
+    ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, onChange));
+  ch.subscribe(status => {
+    const on = status === 'SUBSCRIBED';
+    $('liveDot').className = 'dot' + (on ? ' on' : '');
+    $('liveTxt').textContent = on ? 'en vivo' : 'sin conexión en vivo';
+  });
+}
+
+/* ---------- navegación ---------- */
+function render() {
+  const tabs = [['stock', 'Stock'], ['mov', 'Movimiento'], ['fallas', 'Fallas y reparaciones'], ['hist', 'Historial'], ['catalogo', 'Catálogo']]
+    .filter(([k]) => k !== 'mov' || canWrite() || rol() === 'jefe_obra')
+    .filter(([k]) => k !== 'catalogo' || canWrite());
+  if (!tabs.find(t => t[0] === S.tab)) S.tab = 'stock';
+  $('nav').innerHTML = tabs.map(([k, l]) => `<button class="${S.tab === k ? 'on' : ''}" onclick="go('${k}')">${l}</button>`).join('');
+  ({ stock: rStock, mov: rMov, fallas: rFallas, hist: rHist, catalogo: rCatalogo })[S.tab]();
+}
+function go(t) { S.tab = t; render(); window.scrollTo(0, 0); }
+
+/* =====================================================================
+   STOCK
+   ===================================================================== */
+function stockMap() {
+  const map = {};
+  S.stock.forEach(s => { (map[s.material_id] ||= {})[s.ubicacion_id] = Number(s.cantidad); });
+  return map;
+}
+function rStock() {
+  const herr = S.herr.filter(h => h.estado !== 'baja');
+  const c = k => herr.filter(h => h.estado === k).length;
+  const dep = S.ubic.filter(u => u.tipo === 'deposito').map(u => u.id);
+  const sm = stockMap();
+  const bajos = S.mats.filter(m => m.activo && Number(m.stock_minimo) > 0 &&
+    dep.reduce((a, d) => a + (sm[m.id]?.[d] || 0), 0) < Number(m.stock_minimo));
+  const kpi = (n, l, est, cls) => `<div class="kpi" onclick="S.stockView='herr';S.f.estado='${est}';render()"><b style="color:var(--${cls})">${n}</b><small>${l}</small></div>`;
+
+  $('main').innerHTML = `
+  <div class="kpis">
+    ${kpi(c('disponible'), 'Herramientas disponibles', 'disponible', 'ok')}
+    ${kpi(c('en_obra'), 'En obras', 'en_obra', 'info')}
+    ${kpi(c('en_reparacion'), 'En reparación', 'en_reparacion', 'info')}
+    ${kpi(c('fuera_servicio') + c('extraviada'), 'Fuera de servicio / extraviadas', 'fuera_servicio', 'warn')}
+    <div class="kpi" onclick="S.stockView='mat';S.f.estado='bajo';render()"><b style="color:var(--${bajos.length ? 'bad' : 'ok'})">${bajos.length}</b><small>Materiales bajo mínimo</small></div>
+  </div>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <div style="flex:0 0 auto"><div class="seg">
+        <button class="${S.stockView === 'herr' ? 'on' : ''}" onclick="S.stockView='herr';S.f.estado='';render()">Herramientas</button>
+        <button class="${S.stockView === 'mat' ? 'on' : ''}" onclick="S.stockView='mat';S.f.estado='';render()">Materiales</button>
+      </div></div>
+      <div><label>Buscar</label><input id="fq" value="${esc(S.f.q)}" placeholder="código, nombre, marca…" oninput="S.f.q=this.value;rStockBody()"></div>
+      <div><label>Ubicación</label><select onchange="S.f.ubic=this.value;rStockBody()">${ubicOpts(null, S.f.ubic, 'Todas')}</select></div>
+      <div><label>Estado</label><select onchange="S.f.estado=this.value;rStockBody()">
+        ${S.stockView === 'herr'
+          ? `<option value="">Todos</option>` + Object.entries(EST_H).filter(([k]) => k !== 'baja').map(([k, v]) => `<option value="${k}" ${S.f.estado === k ? 'selected' : ''}>${v}</option>`).join('')
+          : `<option value="">Todos</option><option value="bajo" ${S.f.estado === 'bajo' ? 'selected' : ''}>Bajo mínimo</option><option value="con" ${S.f.estado === 'con' ? 'selected' : ''}>Con stock</option>`}
+      </select></div>
+    </div>
+    <div id="stockBody"></div>
+  </div>`;
+  rStockBody();
+}
+function rStockBody() {
+  const q = S.f.q.trim().toLowerCase();
+  if (S.stockView === 'herr') {
+    const list = S.herr.filter(h => h.estado !== 'baja')
+      .filter(h => !S.f.ubic || h.ubicacion_id === S.f.ubic)
+      .filter(h => !S.f.estado || h.estado === S.f.estado || (S.f.estado === 'fuera_servicio' && h.estado === 'extraviada'))
+      .filter(h => !q || [h.codigo, h.nombre, h.marca, h.modelo, h.categoria, h.nro_serie].join(' ').toLowerCase().includes(q));
+    $('stockBody').innerHTML = !list.length ? `<div class="empty">Sin herramientas para este filtro.</div>` : `
+    <div class="scroll"><table class="tbl"><thead><tr>
+      <th>Código</th><th>Herramienta</th><th>Estado</th><th>Ubicación</th><th class="hide-sm">Quién la tiene</th><th class="hide-sm num">Días allí</th><th class="hide-sm num">Fallas</th>
+    </tr></thead><tbody>
+    ${list.map(h => {
+      const d = days(h.ultimo_movimiento || h.creado_en);
+      const late = h.estado === 'en_obra' && d > 30;
+      return `<tr class="click" onclick="openHist('h','${h.id}')">
+        <td class="code">${esc(h.codigo)}</td>
+        <td>${esc(h.nombre)}<div class="muted" style="font-size:12px">${esc([h.marca, h.modelo].filter(Boolean).join(' '))}</div></td>
+        <td>${pill(h.estado, EST_H[h.estado])}</td>
+        <td>${esc(h.ubicacion)}</td>
+        <td class="hide-sm">${esc(h.persona || '—')}</td>
+        <td class="hide-sm num" style="${late ? 'color:var(--bad);font-weight:700' : ''}">${d ?? '—'}</td>
+        <td class="hide-sm num">${h.total_fallas || 0}${h.fallas_abiertas ? ' ' + pill('abierta', h.fallas_abiertas + ' abierta') : ''}</td>
+      </tr>`; }).join('')}
+    </tbody></table></div>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">${list.length} herramientas · tocá una fila para ver su historial · días en rojo = más de 30 días en obra</p>`;
+  } else {
+    const sm = stockMap();
+    const dep = S.ubic.filter(u => u.tipo === 'deposito').map(u => u.id);
+    const obras = S.ubic.filter(u => u.tipo === 'obra').map(u => u.id);
+    const list = S.mats.filter(m => m.activo).map(m => {
+      const st = sm[m.id] || {};
+      const enDep = dep.reduce((a, d) => a + (st[d] || 0), 0);
+      const enObras = obras.reduce((a, o) => a + (st[o] || 0), 0);
+      const enSel = S.f.ubic ? (st[S.f.ubic] || 0) : null;
+      return { ...m, st, enDep, enObras, enSel, bajo: Number(m.stock_minimo) > 0 && enDep < Number(m.stock_minimo) };
+    })
+      .filter(m => !q || [m.codigo, m.nombre, m.categoria].join(' ').toLowerCase().includes(q))
+      .filter(m => S.f.estado !== 'bajo' || m.bajo)
+      .filter(m => S.f.estado !== 'con' || (S.f.ubic ? m.enSel > 0 : m.enDep + m.enObras > 0))
+      .filter(m => !S.f.ubic || S.f.estado !== '' || m.enSel > 0 || U(S.f.ubic)?.tipo === 'deposito');
+    $('stockBody').innerHTML = !list.length ? `<div class="empty">Sin materiales para este filtro.</div>` : `
+    <div class="scroll"><table class="tbl"><thead><tr>
+      <th>Código</th><th>Material</th><th>Unidad</th>
+      ${S.f.ubic ? `<th class="num">En ${esc(nU(S.f.ubic))}</th>` : ''}
+      <th class="num">Depósito</th><th class="num">En obras</th><th class="num hide-sm">Mínimo</th>
+    </tr></thead><tbody>
+    ${list.map(m => `<tr class="click" onclick="openHist('m','${m.id}')">
+      <td class="code">${esc(m.codigo)}</td>
+      <td>${esc(m.nombre)} ${m.bajo ? pill('bad', 'bajo mínimo') : ''}<div class="muted" style="font-size:12px">${esc(m.categoria || '')}</div></td>
+      <td>${esc(m.unidad)}</td>
+      ${S.f.ubic ? `<td class="num"><b>${fmtN(m.enSel)}</b></td>` : ''}
+      <td class="num" style="${m.bajo ? 'color:var(--bad);font-weight:700' : ''}">${fmtN(m.enDep)}</td>
+      <td class="num" title="${esc(Object.entries(m.st).filter(([k, v]) => v > 0 && U(k)?.tipo === 'obra').map(([k, v]) => nU(k) + ': ' + fmtN(v)).join(' · '))}">${fmtN(m.enObras)}</td>
+      <td class="num hide-sm muted">${fmtN(m.stock_minimo)}</td>
+    </tr>`).join('')}
+    </tbody></table></div>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">Pasá el mouse sobre "En obras" para ver el detalle por obra, o filtrá por ubicación.</p>`;
+  }
+}
+
+/* =====================================================================
+   MOVIMIENTOS
+   ===================================================================== */
+function newMov(tipo) {
+  const t = tipo || (rol() === 'jefe_obra' ? 'consumo' : 'salida');
+  const T = TIPOS[t];
+  const dep = S.ubic.find(u => u.tipo === 'deposito' && u.activa);
+  let origen = '', destino = '';
+  if (T.o && T.o.includes('deposito') && dep) origen = dep.id;
+  if (T.d && T.d.includes('deposito') && dep) destino = dep.id;
+  if (rol() === 'jefe_obra') origen = S.perfil.ubicacion_id || '';
+  S.mov = { tipo: t, origen, destino, persona: '', fecha: nowLocal(), remito: '', obs: '', items: [], q: '' };
+}
+function rMov() {
+  if (!S.mov) newMov();
+  const mv = S.mov, T = TIPOS[mv.tipo];
+  const tiposPermitidos = rol() === 'jefe_obra' ? ['consumo'] : Object.keys(TIPOS);
+  $('main').innerHTML = `
+  <div class="card">
+    <h2>Registrar movimiento</h2>
+    <div class="row">
+      <div><label>Tipo</label><select onchange="newMov(this.value);rMov()">
+        ${tiposPermitidos.map(k => `<option value="${k}" ${k === mv.tipo ? 'selected' : ''}>${TIPOS[k].lbl}</option>`).join('')}
+      </select></div>
+      ${T.o ? `<div><label>Origen</label><select ${rol() === 'jefe_obra' ? 'disabled' : ''} onchange="S.mov.origen=this.value;S.mov.items=[];rMov()">${ubicOpts(T.o, mv.origen)}</select></div>` : ''}
+      ${T.d ? `<div><label>Destino</label><select onchange="S.mov.destino=this.value;rMov()">${ubicOpts(T.d, mv.destino)}</select></div>` : ''}
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><label>${T.persona}${['salida', 'transferencia'].includes(mv.tipo) ? ' *' : ''}</label>
+        <div style="display:flex;gap:6px"><select onchange="S.mov.persona=this.value">${persOpts(mv.persona)}</select>
+        ${canWrite() ? `<button class="btn sec sm" title="Agregar persona" onclick="quickPersona()">+</button>` : ''}</div></div>
+      <div><label>Fecha y hora</label><input type="datetime-local" value="${mv.fecha}" onchange="S.mov.fecha=this.value"></div>
+      <div><label>Remito / factura externa</label><input value="${esc(mv.remito)}" oninput="S.mov.remito=this.value" placeholder="opcional"></div>
+    </div>
+    <div style="margin-top:8px"><label>Observaciones</label><input value="${esc(mv.obs)}" oninput="S.mov.obs=this.value"></div>
+
+    <div class="items">
+      <label>Ítems (${mv.items.length})</label>
+      ${!T.o || mv.origen || mv.tipo === 'ingreso' ? `
+        <input id="pickQ" placeholder="Buscar ${[T.herr && 'herramienta', T.mat && 'material'].filter(Boolean).join(' o ')} para agregar…" value="${esc(mv.q)}" oninput="S.mov.q=this.value;rPick()" autocomplete="off">
+        <div id="pick"></div>` : `<p class="muted">Elegí primero el origen.</p>`}
+      <div id="itemList"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn" onclick="submitMov()" ${mv.items.length ? '' : 'disabled'}>Registrar ${mv.items.length ? '(' + mv.items.length + ')' : ''}</button>
+      <button class="btn sec" onclick="newMov(S.mov.tipo);rMov()">Limpiar</button>
+    </div>
+  </div>
+  <div class="card"><h2>Últimos movimientos</h2><div id="lastMovs" class="muted">Cargando…</div></div>`;
+  rItems(); rPick(); loadLastMovs();
+}
+function candidates() {
+  const mv = S.mov, T = TIPOS[mv.tipo], q = mv.q.trim().toLowerCase();
+  if (!q && mv.tipo !== 'ingreso' && !mv.origen) return [];
+  const out = [];
+  if (T.herr && mv.origen) {
+    S.herr.filter(h => h.ubicacion_id === mv.origen && h.estado !== 'baja')
+      .filter(h => !['salida', 'transferencia'].includes(mv.tipo) || ['disponible', 'en_obra'].includes(h.estado))
+      .filter(h => !mv.items.some(i => i.kind === 'h' && i.id === h.id))
+      .filter(h => !q || [h.codigo, h.nombre, h.marca].join(' ').toLowerCase().includes(q))
+      .forEach(h => out.push({ kind: 'h', id: h.id, txt: `<span><span class="code">${esc(h.codigo)}</span> ${esc(h.nombre)}</span>${pill(h.estado, EST_H[h.estado])}` }));
+  }
+  if (T.mat) {
+    const sm = stockMap();
+    S.mats.filter(m => m.activo)
+      .filter(m => mv.tipo === 'ingreso' || (sm[m.id]?.[mv.origen] || 0) > 0)
+      .filter(m => !mv.items.some(i => i.kind === 'm' && i.id === m.id))
+      .filter(m => !q || [m.codigo, m.nombre, m.categoria].join(' ').toLowerCase().includes(q))
+      .forEach(m => out.push({ kind: 'm', id: m.id, txt: `<span><span class="code">${esc(m.codigo)}</span> ${esc(m.nombre)}</span><span class="muted">${mv.tipo === 'ingreso' ? esc(m.unidad) : 'hay ' + fmtN(sm[m.id]?.[mv.origen]) + ' ' + esc(m.unidad)}</span>` }));
+  }
+  return out.slice(0, 40);
+}
+function rPick() {
+  if (!$('pick')) return;
+  const c = candidates();
+  $('pick').innerHTML = !S.mov.q && !c.length ? '' : !c.length ? `<p class="muted" style="font-size:13px">Nada disponible en el origen con ese texto.</p>` :
+    `<div class="pick">${c.map(x => `<div onclick="addItem('${x.kind}','${x.id}')">${x.txt}</div>`).join('')}</div>`;
+}
+function addItem(kind, id) {
+  S.mov.items.push({ kind, id, cantidad: kind === 'm' ? '' : 1, estado_item: 'ok', tipo_falla: 'rotura', observaciones: '', costo: '', comprobante: '' });
+  S.mov.q = ''; rMov();
+  setTimeout(() => { const el = document.querySelector(`[data-cant="${S.mov.items.length - 1}"]`) || $('pickQ'); el && el.focus(); }, 0);
+}
+function delItem(i) { S.mov.items.splice(i, 1); rMov(); }
+function setIt(i, k, v) { S.mov.items[i][k] = v; if (k === 'estado_item') rItems(); }
+function rItems() {
+  const mv = S.mov, sm = stockMap();
+  $('itemList').innerHTML = mv.items.map((it, i) => {
+    const o = it.kind === 'h' ? H(it.id) : M(it.id);
+    const disp = it.kind === 'm' && mv.origen ? (sm[it.id]?.[mv.origen] || 0) : null;
+    let extra = '';
+    if (mv.tipo === 'devolucion') {
+      extra = `<select onchange="setIt(${i},'estado_item',this.value)">
+          <option value="ok" ${it.estado_item === 'ok' ? 'selected' : ''}>Vuelve OK</option>
+          <option value="con_falla" ${it.estado_item === 'con_falla' ? 'selected' : ''}>${it.kind === 'h' ? 'Vuelve con falla' : 'En mal estado (se descarta)'}</option></select>`;
+      if (it.estado_item === 'con_falla') extra += `<select onchange="setIt(${i},'tipo_falla',this.value)">${Object.entries(TFALLA).map(([k, v]) => `<option value="${k}" ${it.tipo_falla === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+          <input placeholder="Describí la falla *" value="${esc(it.observaciones)}" oninput="setIt(${i},'observaciones',this.value)">`;
+    } else if (mv.tipo === 'envio_reparacion') {
+      const fa = S.fallas.find(f => f.herramienta_id === it.id && f.estado === 'abierta');
+      extra = fa ? `<span class="muted" style="font-size:13px">Falla abierta: ${esc(fa.descripcion)}</span>` :
+        `<select onchange="setIt(${i},'tipo_falla',this.value)">${Object.entries(TFALLA).map(([k, v]) => `<option value="${k}" ${it.tipo_falla === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+         <input placeholder="Motivo de la reparación *" value="${esc(it.observaciones)}" oninput="setIt(${i},'observaciones',this.value)">`;
+    } else if (mv.tipo === 'retorno_reparacion') {
+      extra = `<select onchange="setIt(${i},'estado_item',this.value)">
+          <option value="ok" ${it.estado_item === 'ok' ? 'selected' : ''}>Reparada</option>
+          <option value="irreparable" ${it.estado_item === 'irreparable' ? 'selected' : ''}>Irreparable</option></select>
+        <input type="number" min="0" step="0.01" placeholder="Costo $" value="${esc(it.costo)}" oninput="setIt(${i},'costo',this.value)">
+        <input placeholder="Factura / comprobante" value="${esc(it.comprobante)}" oninput="setIt(${i},'comprobante',this.value)">
+        <input placeholder="Qué se reparó" value="${esc(it.observaciones)}" oninput="setIt(${i},'observaciones',this.value)">`;
+    } else {
+      extra = `<input placeholder="Observación (opcional)" value="${esc(it.observaciones)}" oninput="setIt(${i},'observaciones',this.value)">`;
+    }
+    return `<div class="item"><div>
+        <div><span class="code">${esc(o?.codigo)}</span> <b>${esc(o?.nombre)}</b></div>
+        <div class="sub">
+          ${it.kind === 'm' ? `<input data-cant="${i}" type="number" min="0" step="0.01" placeholder="Cantidad (${esc(o?.unidad)})${disp !== null ? ' · hay ' + fmtN(disp) : ''}" value="${esc(it.cantidad)}" oninput="setIt(${i},'cantidad',this.value)">` : ''}
+          ${extra}
+        </div></div>
+      <button class="x" title="Quitar" onclick="delItem(${i})">×</button></div>`;
+  }).join('');
+}
+async function submitMov() {
+  const mv = S.mov, T = TIPOS[mv.tipo];
+  if (T.o && !mv.origen) return toast('Falta el origen', true);
+  if (T.d && !mv.destino) return toast('Falta el destino', true);
+  if (['salida', 'transferencia'].includes(mv.tipo) && !mv.persona) return toast('Indicá quién retira', true);
+  for (const it of mv.items) {
+    if (it.kind === 'm' && !(Number(it.cantidad) > 0)) return toast('Cargá la cantidad de ' + M(it.id)?.nombre, true);
+    if (it.estado_item === 'con_falla' && it.kind === 'h' && !it.observaciones.trim()) return toast('Describí la falla de ' + H(it.id)?.codigo, true);
+  }
+  const p = {
+    tipo: mv.tipo, origen_id: mv.origen || null, destino_id: mv.destino || null, persona_id: mv.persona || null,
+    fecha: mv.fecha ? new Date(mv.fecha).toISOString() : null, remito_externo: mv.remito, observaciones: mv.obs,
+    items: mv.items.map(it => ({
+      [it.kind === 'h' ? 'herramienta_id' : 'material_id']: it.id,
+      cantidad: it.kind === 'm' ? Number(it.cantidad) : 1,
+      estado_item: it.estado_item, tipo_falla: it.tipo_falla, observaciones: it.observaciones,
+      costo: it.costo, comprobante: it.comprobante
+    }))
+  };
+  const btn = document.querySelector('#main .btn'); if (btn) btn.disabled = true;
+  const { data: id, error } = await sb.rpc('pn_registrar_movimiento', { p });
+  if (error) { if (btn) btn.disabled = false; return toast(friendly(error), true); }
+  const snap = JSON.parse(JSON.stringify(mv));
+  await loadAll();
+  const { data: cab } = await sb.from('pn_movimientos').select('nro,fecha').eq('id', id).single();
+  newMov(snap.tipo); rMov();
+  showRemito(snap, cab);
+}
+function showRemito(mv, cab) {
+  const T = TIPOS[mv.tipo];
+  modal(`
+    <div id="printArea"><div class="remito">
+      <h3>YINGO S.A. — Remito interno de pañol Nº ${esc(cab?.nro)}</h3>
+      <div>${esc(T.lbl)} · ${fmtDT(cab?.fecha)}</div>
+      <div style="margin:8px 0">
+        ${T.o ? `<b>Origen:</b> ${esc(nU(mv.origen))} &nbsp; ` : ''}${T.d ? `<b>Destino:</b> ${esc(nU(mv.destino))}` : ''}<br>
+        <b>${esc(T.persona)}:</b> ${esc(mv.persona ? nP(mv.persona) : '—')} ${mv.remito ? ' · <b>Comprobante:</b> ' + esc(mv.remito) : ''}
+      </div>
+      <table class="tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Cant.</th><th>Estado</th></tr></thead><tbody>
+      ${mv.items.map(it => { const o = it.kind === 'h' ? H(it.id) : M(it.id);
+        return `<tr><td class="code">${esc(o?.codigo)}</td><td>${esc(o?.nombre)}${it.observaciones ? '<br><small>' + esc(it.observaciones) + '</small>' : ''}</td><td class="num">${it.kind === 'm' ? fmtN(it.cantidad) + ' ' + esc(o?.unidad) : '1'}</td><td>${esc(it.estado_item)}</td></tr>`; }).join('')}
+      </tbody></table>
+      ${mv.obs ? `<p><b>Obs.:</b> ${esc(mv.obs)}</p>` : ''}
+      <div class="firmas"><div>Entrega (pañol)</div><div>Recibe / retira</div></div>
+    </div></div>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" onclick="window.print()">Imprimir remito</button><button class="btn sec" onclick="closeModal()">Cerrar</button></div>`);
+  toast('Movimiento registrado');
+}
+async function loadLastMovs() {
+  const { data, error } = await sb.from('pn_movimientos').select('id,nro,tipo,fecha,origen_id,destino_id,persona_id,remito_externo').order('fecha', { ascending: false }).limit(15);
+  if (!$('lastMovs')) return;
+  if (error) { $('lastMovs').textContent = error.message; return; }
+  $('lastMovs').innerHTML = !data.length ? 'Todavía no hay movimientos.' : `<div class="scroll"><table class="tbl"><thead><tr><th>Nº</th><th>Fecha</th><th>Tipo</th><th>Origen → Destino</th><th class="hide-sm">Persona</th></tr></thead><tbody>
+    ${data.map(m => `<tr><td class="code">${m.nro}</td><td>${fmtDT(m.fecha)}</td><td>${esc(EV[m.tipo])}</td><td>${esc(m.origen_id ? nU(m.origen_id) : '—')} → ${esc(m.destino_id ? nU(m.destino_id) : '—')}</td><td class="hide-sm">${esc(m.persona_id ? nP(m.persona_id) : '—')}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+function quickPersona() {
+  modal(`<h2 style="margin-top:0">Nueva persona</h2>
+    <label>Nombre y apellido *</label><input id="qpN">
+    <div class="row" style="margin-top:8px"><div><label>DNI</label><input id="qpD"></div><div><label>Empresa</label><input id="qpE" value="Yingo S.A."></div></div>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" onclick="saveQuickPersona()">Guardar</button><button class="btn sec" onclick="closeModal()">Cancelar</button></div>`);
+  setTimeout(() => $('qpN').focus(), 0);
+}
+async function saveQuickPersona() {
+  const nombre = $('qpN').value.trim(); if (!nombre) return toast('Falta el nombre', true);
+  const { data, error } = await sb.from('pn_personas').insert({ nombre, dni: $('qpD').value.trim() || null, empresa: $('qpE').value.trim() || 'Yingo S.A.' }).select().single();
+  if (error) return toast(friendly(error), true);
+  S.personas.push(data); S.personas.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  if (S.mov) S.mov.persona = data.id;
+  closeModal(); render();
+}
+
+/* =====================================================================
+   FALLAS Y REPARACIONES
+   ===================================================================== */
+function rFallas() {
+  const filtros = { pendientes: ['abierta', 'en_reparacion'], reparadas: ['reparada'], todas: null };
+  const list = S.fallas.filter(f => !filtros[S.fallaFiltro] || filtros[S.fallaFiltro].includes(f.estado));
+  const herrOpts = S.herr.filter(h => !['baja'].includes(h.estado)).map(h => `<option value="h:${h.id}">${esc(h.codigo)} · ${esc(h.nombre)} (${esc(h.ubicacion)})</option>`).join('');
+  const matOpts = S.mats.filter(m => m.activo).map(m => `<option value="m:${m.id}">${esc(m.codigo)} · ${esc(m.nombre)}</option>`).join('');
+  $('main').innerHTML = `
+  <div class="grid2">
+  ${canReport() ? `<div class="card">
+    <h2>Reportar falla</h2>
+    <label>Herramienta / material *</label>
+    <select id="nfItem" onchange="fillFallaDefaults()"><option value="">— elegir —</option><optgroup label="Herramientas">${herrOpts}</optgroup><optgroup label="Materiales">${matOpts}</optgroup></select>
+    <div class="row" style="margin-top:8px">
+      <div><label>Obra donde ocurrió</label><select id="nfObra">${ubicOpts(['obra', 'deposito'], rol() === 'jefe_obra' ? S.perfil.ubicacion_id : '')}</select></div>
+      <div><label>Quién la tenía</label><select id="nfPers">${persOpts('')}</select></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><label>Fecha</label><input id="nfFecha" type="date" value="${todayISO()}"></div>
+      <div><label>Tipo</label><select id="nfTipo">${Object.entries(TFALLA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+    </div>
+    <div style="margin-top:8px"><label>Descripción *</label><textarea id="nfDesc" placeholder="Qué pasó, síntomas, cómo se detectó"></textarea></div>
+    <p class="muted" style="font-size:12px">La herramienta queda "fuera de servicio" (o "extraviada" si es robo/extravío) y no se puede volver a enviar a obra hasta repararla.</p>
+    <button class="btn" onclick="saveFalla()">Registrar falla</button>
+  </div>` : ''}
+  <div class="card">
+    <h2>Resumen</h2>
+    ${(() => {
+      const ab = S.fallas.filter(f => f.estado === 'abierta').length, er = S.fallas.filter(f => f.estado === 'en_reparacion').length;
+      const year = String(new Date().getFullYear());
+      const cost = S.fallas.filter(f => (f.fecha_reparacion || '').startsWith(year)).reduce((a, f) => a + Number(f.costo_reparacion || 0), 0);
+      const porObra = {}; S.fallas.filter(f => f.obra_id && (f.fecha_falla || '').startsWith(year)).forEach(f => porObra[f.obra_id] = (porObra[f.obra_id] || 0) + 1);
+      return `<div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+        <div class="kpi"><b style="color:var(--warn)">${ab}</b><small>Abiertas</small></div>
+        <div class="kpi"><b style="color:var(--info)">${er}</b><small>En reparación</small></div>
+        <div class="kpi"><b>$${fmtN(cost)}</b><small>Reparaciones ${year}</small></div></div>
+        <label>Fallas por obra (${year})</label>
+        ${Object.keys(porObra).length ? Object.entries(porObra).sort((a, b) => b[1] - a[1]).map(([o, n]) => `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line)"><span>${esc(nU(o))}</span><b>${n}</b></div>`).join('') : '<p class="muted">Sin fallas registradas.</p>'}`;
+    })()}
+  </div>
+  </div>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px"><h2 style="margin:0">Fallas</h2>
+      <div style="flex:0 0 auto"><div class="seg">
+        ${['pendientes', 'reparadas', 'todas'].map(k => `<button class="${S.fallaFiltro === k ? 'on' : ''}" onclick="S.fallaFiltro='${k}';rFallas()">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}
+      </div></div></div>
+    ${!list.length ? `<div class="empty">Sin fallas en esta vista.</div>` : `<div class="scroll"><table class="tbl"><thead><tr>
+      <th>Fecha</th><th>Ítem</th><th>Obra</th><th class="hide-sm">Quién</th><th>Falla</th><th>Estado</th><th>Reparación</th><th></th></tr></thead><tbody>
+      ${list.map(f => { const o = f.herramienta_id ? H(f.herramienta_id) : M(f.material_id);
+        return `<tr>
+        <td>${fmtDay(f.fecha_falla)}</td>
+        <td class="click" style="cursor:pointer" onclick="openHist('${f.herramienta_id ? 'h' : 'm'}','${f.herramienta_id || f.material_id}')"><span class="code">${esc(o?.codigo)}</span><br>${esc(o?.nombre)}</td>
+        <td>${esc(f.obra_id ? nU(f.obra_id) : '—')}</td>
+        <td class="hide-sm">${esc(f.persona_id ? nP(f.persona_id) : '—')}</td>
+        <td>${pill('warn', TFALLA[f.tipo_falla])}<div style="font-size:13px">${esc(f.descripcion)}</div></td>
+        <td>${pill(f.estado, EST_F[f.estado])}</td>
+        <td style="font-size:13px">${f.taller_id ? esc(nU(f.taller_id)) : '—'}${f.fecha_reparacion ? '<br>' + fmtDay(f.fecha_reparacion) : f.fecha_envio_reparacion ? '<br><span class="muted">enviada ' + fmtDay(f.fecha_envio_reparacion) + '</span>' : ''}${f.costo_reparacion ? '<br>$' + fmtN(f.costo_reparacion) : ''}</td>
+        <td>${canWrite() && ['abierta', 'en_reparacion'].includes(f.estado) ? `<button class="btn sec sm" onclick="repairModal('${f.id}')">Cerrar reparación</button>` : ''}</td>
+      </tr>`; }).join('')}
+    </tbody></table></div>`}
+    <p class="muted" style="font-size:12px;margin:8px 0 0">Reparación externa: usá Movimiento → "Envío a reparación" y luego "Retorno de reparación" (queda el traslado en el historial). "Cerrar reparación" es para arreglos en el propio pañol o para completar datos.</p>
+  </div>`;
+}
+function fillFallaDefaults() {
+  const v = $('nfItem').value; if (!v.startsWith('h:')) return;
+  const h = H(v.slice(2)); if (!h) return;
+  if (h.ubicacion_tipo === 'obra') $('nfObra').value = h.ubicacion_id;
+  if (h.persona_id) $('nfPers').value = h.persona_id;
+}
+async function saveFalla() {
+  const v = $('nfItem').value, desc = $('nfDesc').value.trim();
+  if (!v) return toast('Elegí la herramienta o material', true);
+  if (!desc) return toast('Describí la falla', true);
+  const row = {
+    [v.startsWith('h:') ? 'herramienta_id' : 'material_id']: v.slice(2),
+    obra_id: $('nfObra').value || null, persona_id: $('nfPers').value || null,
+    fecha_falla: $('nfFecha').value || todayISO(), tipo_falla: $('nfTipo').value, descripcion: desc
+  };
+  const { error } = await sb.from('pn_fallas').insert(row);
+  if (error) return toast(friendly(error), true);
+  toast('Falla registrada'); await loadAll(); rFallas();
+}
+function repairModal(id) {
+  const f = S.fallas.find(x => x.id === id); const o = f.herramienta_id ? H(f.herramienta_id) : M(f.material_id);
+  modal(`<h2 style="margin-top:0">Cerrar reparación · ${esc(o?.codigo)}</h2>
+    <p class="muted" style="margin-top:0">${esc(f.descripcion)}</p>
+    <div class="row">
+      <div><label>Resultado</label><select id="rpRes"><option value="reparada">Reparada</option><option value="irreparable">Irreparable</option></select></div>
+      <div><label>Fecha de reparación *</label><input id="rpFecha" type="date" value="${todayISO()}" min="${f.fecha_falla}"></div>
+    </div>
+    <div style="margin-top:8px"><label>Lugar de reparación *</label>
+      <div style="display:flex;gap:6px"><select id="rpTaller">${ubicOpts(['taller'], f.taller_id)}</select><button class="btn sec sm" title="Nuevo taller" onclick="go('catalogo');closeModal()">+</button></div></div>
+    <div class="row" style="margin-top:8px">
+      <div><label>Costo $</label><input id="rpCosto" type="number" min="0" step="0.01" value="${esc(f.costo_reparacion || '')}"></div>
+      <div><label>Comprobante</label><input id="rpComp" value="${esc(f.comprobante || '')}"></div>
+    </div>
+    <div style="margin-top:8px"><label>Detalle del trabajo</label><textarea id="rpDet">${esc(f.detalle_reparacion || '')}</textarea></div>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" onclick="saveRepair('${id}')">Guardar</button><button class="btn sec" onclick="closeModal()">Cancelar</button></div>`);
+}
+async function saveRepair(id) {
+  const res = $('rpRes').value, taller = $('rpTaller').value, fecha = $('rpFecha').value;
+  if (res === 'reparada' && (!taller || !fecha)) return toast('Fecha y lugar de reparación son obligatorios', true);
+  const { error } = await sb.from('pn_fallas').update({
+    estado: res, taller_id: taller || null, fecha_reparacion: fecha || null,
+    costo_reparacion: $('rpCosto').value === '' ? null : Number($('rpCosto').value),
+    comprobante: $('rpComp').value.trim() || null, detalle_reparacion: $('rpDet').value.trim() || null
+  }).eq('id', id);
+  if (error) return toast(friendly(error), true);
+  closeModal(); toast('Reparación registrada'); await loadAll(); rFallas();
+}
+
+/* =====================================================================
+   HISTORIAL
+   ===================================================================== */
+function openHist(kind, id) { S.hist = { kind, id, q: '' }; S.tab = 'hist'; render(); window.scrollTo(0, 0); }
+function rHist() {
+  S.hist ||= { kind: null, id: null, q: '' };
+  $('main').innerHTML = `
+  <div class="card">
+    <label>Buscar herramienta o material</label>
+    <input id="hq" placeholder="código o nombre…" value="${esc(S.hist.q)}" oninput="S.hist.q=this.value;rHistPick()" autocomplete="off">
+    <div id="hpick"></div>
+  </div>
+  <div id="histBody">${S.hist.id ? '<div class="card muted">Cargando historial…</div>' : '<div class="empty">Elegí una herramienta o material para ver su historial completo: obras, quién la retiró, fallas y reparaciones.</div>'}</div>`;
+  rHistPick();
+  if (S.hist.id) loadHist();
+}
+function rHistPick() {
+  const q = S.hist.q.trim().toLowerCase(); if (!q) { $('hpick').innerHTML = ''; return; }
+  const c = [
+    ...S.herr.filter(h => [h.codigo, h.nombre, h.marca, h.nro_serie].join(' ').toLowerCase().includes(q)).map(h => ({ k: 'h', id: h.id, t: `<span><span class="code">${esc(h.codigo)}</span> ${esc(h.nombre)}</span>${pill(h.estado, EST_H[h.estado])}` })),
+    ...S.mats.filter(m => [m.codigo, m.nombre].join(' ').toLowerCase().includes(q)).map(m => ({ k: 'm', id: m.id, t: `<span><span class="code">${esc(m.codigo)}</span> ${esc(m.nombre)}</span><span class="muted">material</span>` }))
+  ].slice(0, 30);
+  $('hpick').innerHTML = c.length ? `<div class="pick">${c.map(x => `<div onclick="openHist('${x.k}','${x.id}')">${x.t}</div>`).join('')}</div>` : '<p class="muted">Sin coincidencias.</p>';
+}
+async function loadHist() {
+  const { kind, id } = S.hist;
+  const { data, error } = await sb.from('v_pn_historial').select('*').eq(kind === 'h' ? 'herramienta_id' : 'material_id', id).order('fecha', { ascending: false }).limit(500);
+  if (error) { $('histBody').innerHTML = `<div class="card">${esc(error.message)}</div>`; return; }
+  S.hist.rows = data;
+  const o = kind === 'h' ? H(id) : M(id);
+  const sm = stockMap();
+  const ficha = kind === 'h' ? `
+    <div class="row" style="align-items:start">
+      <div><h2 style="margin:0"><span class="code">${esc(o.codigo)}</span> · ${esc(o.nombre)}</h2>
+        <div class="muted">${esc([o.categoria, o.marca, o.modelo, o.nro_serie && 'S/N ' + o.nro_serie].filter(Boolean).join(' · '))}</div></div>
+      <div style="flex:0 0 auto;text-align:right">${pill(o.estado, EST_H[o.estado])}<div style="margin-top:4px">${esc(o.ubicacion)}${o.persona ? ' · ' + esc(o.persona) : ''}</div></div>
+    </div>
+    <div class="kpis" style="margin:12px 0 0">
+      <div class="kpi"><b>${data.filter(r => r.evento === 'salida' || r.evento === 'transferencia').length}</b><small>Salidas a obra</small></div>
+      <div class="kpi"><b>${new Set(data.filter(r => r.clase === 'movimiento' && ['salida', 'transferencia'].includes(r.evento)).map(r => r.destino)).size}</b><small>Obras distintas</small></div>
+      <div class="kpi"><b style="color:var(--warn)">${data.filter(r => r.clase === 'falla').length}</b><small>Fallas</small></div>
+      <div class="kpi"><b>$${fmtN(data.filter(r => r.clase === 'reparacion').reduce((a, r) => a + Number(r.costo || 0), 0))}</b><small>Gastado en reparaciones</small></div>
+    </div>` : `
+    <h2 style="margin:0"><span class="code">${esc(o.codigo)}</span> · ${esc(o.nombre)} <span class="muted">(${esc(o.unidad)})</span></h2>
+    <div class="muted" style="margin-top:6px">${Object.entries(sm[id] || {}).filter(([, v]) => v > 0).map(([u, v]) => `${esc(nU(u))}: <b>${fmtN(v)}</b>`).join(' · ') || 'Sin stock'}</div>`;
+  const line = r => {
+    const when = r.clase === 'movimiento' ? fmtDT(r.fecha) : fmtD(r.fecha);
+    if (r.clase === 'falla') return `<li class="falla"><div class="t">${when}</div><b>Falla: ${esc(TFALLA[r.evento] || r.evento)}</b> ${pill(r.estado, EST_F[r.estado])}<br>
+        ${r.origen ? 'Obra: <b>' + esc(r.origen) + '</b> · ' : ''}${r.persona ? 'La tenía: <b>' + esc(r.persona) + '</b>' : ''}<br><span>${esc(r.detalle)}</span>${r.registrado_por ? '<div class="t">registró ' + esc(r.registrado_por) + '</div>' : ''}</li>`;
+    if (r.clase === 'reparacion') return `<li class="reparacion"><div class="t">${when}</div><b>${r.evento === 'irreparable' ? 'Declarada irreparable' : 'Reparada'}</b> en <b>${esc(r.destino || '—')}</b>${r.costo ? ' · $' + fmtN(r.costo) : ''}${r.comprobante ? ' · ' + esc(r.comprobante) : ''}${r.detalle ? '<br>' + esc(r.detalle) : ''}</li>`;
+    return `<li><div class="t">${when} · remito Nº ${esc(r.nro)}</div><b>${esc(EV[r.evento] || r.evento)}</b>${kind === 'm' ? ' · ' + fmtN(r.cantidad) + ' ' + esc(o.unidad) : ''} ${r.estado && r.estado !== 'ok' ? pill(r.estado, r.estado.replace('_', ' ')) : ''}<br>
+      ${esc(r.origen || '—')} → ${esc(r.destino || '—')}${r.persona ? ' · <b>' + esc(r.persona) + '</b>' : ''}${r.detalle ? '<br>' + esc(r.detalle) : ''}${r.registrado_por ? '<div class="t">registró ' + esc(r.registrado_por) + (r.comprobante ? ' · comp. ' + esc(r.comprobante) : '') + '</div>' : ''}</li>`;
+  };
+  $('histBody').innerHTML = `
+    <div class="card">${ficha}</div>
+    <div class="card"><div class="row" style="margin-bottom:10px"><h2 style="margin:0">Historial (${data.length})</h2>
+      <div style="flex:0 0 auto"><button class="btn sec sm" onclick="exportHist()">Exportar CSV</button></div></div>
+      ${data.length ? `<ul class="tl">${data.map(line).join('')}</ul>` : '<div class="empty">Sin movimientos registrados.</div>'}
+    </div>`;
+}
+function exportHist() {
+  const o = S.hist.kind === 'h' ? H(S.hist.id) : M(S.hist.id);
+  const cols = ['fecha', 'clase', 'evento', 'nro', 'origen', 'destino', 'persona', 'cantidad', 'estado', 'detalle', 'costo', 'comprobante', 'registrado_por'];
+  const csv = [cols.join(';'), ...S.hist.rows.map(r => cols.map(c => `"${String(c === 'fecha' ? fmtDT(r[c]) : r[c] ?? '').replace(/"/g, '""')}"`).join(';'))].join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `historial_${o.codigo}.csv`; a.click();
+}
+
+/* =====================================================================
+   CATÁLOGO (admin / pañolero)
+   ===================================================================== */
+function rCatalogo() {
+  const nextCode = (arr, pre) => { const n = Math.max(0, ...arr.map(x => parseInt((x.codigo || '').replace(/\D/g, ''), 10) || 0)) + 1; return pre + String(n).padStart(4, '0'); };
+  $('main').innerHTML = `
+  <div class="grid2">
+    <div class="card"><h2>Nueva herramienta</h2>
+      <div class="row"><div><label>Código *</label><input id="chC" value="${nextCode(S.herr, 'HER-')}"></div><div><label>Categoría</label><input id="chCat" list="catsH" placeholder="Eléctrica, manual, medición…"></div></div>
+      <div style="margin-top:8px"><label>Nombre *</label><input id="chN" placeholder="Amoladora angular 9&quot;"></div>
+      <div class="row" style="margin-top:8px"><div><label>Marca</label><input id="chMa"></div><div><label>Modelo</label><input id="chMo"></div><div><label>Nº serie</label><input id="chS"></div></div>
+      <div class="row" style="margin-top:8px"><div><label>Ubicación inicial *</label><select id="chU">${ubicOpts(['deposito'], S.ubic.find(u => u.tipo === 'deposito')?.id)}</select></div><div><label>Valor reposición $</label><input id="chV" type="number" min="0"></div></div>
+      <div style="margin-top:10px"><button class="btn" onclick="saveHerr()">Agregar herramienta</button></div>
+      <datalist id="catsH">${[...new Set(S.herr.map(h => h.categoria).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+    </div>
+    <div class="card"><h2>Nuevo material</h2>
+      <div class="row"><div><label>Código *</label><input id="cmC" value="${nextCode(S.mats, 'MAT-')}"></div><div><label>Categoría</label><input id="cmCat" list="catsM" placeholder="Áridos, hierro, eléctrico…"></div></div>
+      <div style="margin-top:8px"><label>Nombre *</label><input id="cmN" placeholder="Cemento portland 50 kg"></div>
+      <div class="row" style="margin-top:8px"><div><label>Unidad *</label><input id="cmU" value="u" list="unids"></div><div><label>Stock mínimo en depósito</label><input id="cmMin" type="number" min="0" value="0"></div></div>
+      <p class="muted" style="font-size:12px">El stock inicial se carga con Movimiento → "Ingreso (compra)", así queda registrado.</p>
+      <button class="btn" onclick="saveMat()">Agregar material</button>
+      <datalist id="catsM">${[...new Set(S.mats.map(m => m.categoria).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+      <datalist id="unids">${['u', 'bolsa', 'kg', 'tn', 'm', 'm2', 'm3', 'l', 'rollo', 'caja', 'barra'].map(u => `<option value="${u}">`).join('')}</datalist>
+    </div>
+    <div class="card"><h2>Personas que retiran</h2>
+      <div class="row"><div><label>Nombre *</label><input id="cpN"></div><div><label>DNI</label><input id="cpD"></div></div>
+      <div class="row" style="margin-top:8px"><div><label>Empresa</label><input id="cpE" value="Yingo S.A."></div><div><label>Teléfono</label><input id="cpT"></div></div>
+      <div style="margin-top:10px"><button class="btn" onclick="savePers()">Agregar persona</button></div>
+      <div style="margin-top:12px;max-height:220px;overflow:auto">${S.personas.map(p => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)"><span>${esc(p.nombre)} <span class="muted">${esc(p.empresa)}</span></span><button class="btn sec sm" onclick="toggleAct('pn_personas','${p.id}','activo',${!p.activo})">${p.activo ? 'Desactivar' : 'Activar'}</button></div>`).join('')}</div>
+    </div>
+    <div class="card"><h2>Ubicaciones (depósito, obras, talleres)</h2>
+      <div class="row"><div><label>Nombre *</label><input id="cuN"></div><div><label>Tipo *</label><select id="cuT"><option value="obra">Obra</option><option value="taller">Taller de reparación</option><option value="deposito">Depósito</option></select></div></div>
+      <div class="row" style="margin-top:8px"><div><label>Dirección</label><input id="cuD"></div><div><label>Contacto</label><input id="cuC"></div></div>
+      <div style="margin-top:10px"><button class="btn" onclick="saveUbic()">Agregar ubicación</button></div>
+      <div style="margin-top:12px;max-height:220px;overflow:auto">${S.ubic.map(u => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)"><span>${esc(u.nombre)} ${pill(u.activa ? 'info' : 'baja', u.tipo)}</span><button class="btn sec sm" onclick="toggleAct('pn_ubicaciones','${u.id}','activa',${!u.activa})">${u.activa ? 'Cerrar' : 'Reabrir'}</button></div>`).join('')}</div>
+    </div>
+  </div>`;
+}
+async function ins(table, row, msg) {
+  const { error } = await sb.from(table).insert(row);
+  if (error) { toast(error.code === '23505' ? 'Ese código o nombre ya existe' : friendly(error), true); return false; }
+  toast(msg); await loadAll(); rCatalogo(); return true;
+}
+const val = id => $(id).value.trim() || null;
+function saveHerr() {
+  if (!val('chC') || !val('chN') || !val('chU')) return toast('Código, nombre y ubicación son obligatorios', true);
+  ins('pn_herramientas', { codigo: val('chC'), nombre: val('chN'), categoria: val('chCat'), marca: val('chMa'), modelo: val('chMo'), nro_serie: val('chS'), ubicacion_id: val('chU'), valor_reposicion: val('chV') ? Number(val('chV')) : null }, 'Herramienta agregada');
+}
+function saveMat() {
+  if (!val('cmC') || !val('cmN') || !val('cmU')) return toast('Código, nombre y unidad son obligatorios', true);
+  ins('pn_materiales', { codigo: val('cmC'), nombre: val('cmN'), categoria: val('cmCat'), unidad: val('cmU'), stock_minimo: Number(val('cmMin') || 0) }, 'Material agregado');
+}
+function savePers() {
+  if (!val('cpN')) return toast('Falta el nombre', true);
+  ins('pn_personas', { nombre: val('cpN'), dni: val('cpD'), empresa: val('cpE') || 'Yingo S.A.', telefono: val('cpT') }, 'Persona agregada');
+}
+function saveUbic() {
+  if (!val('cuN')) return toast('Falta el nombre', true);
+  ins('pn_ubicaciones', { nombre: val('cuN'), tipo: $('cuT').value, direccion: val('cuD'), contacto: val('cuC') }, 'Ubicación agregada');
+}
+async function toggleAct(table, id, field, v) {
+  const { error } = await sb.from(table).update({ [field]: v }).eq('id', id);
+  if (error) return toast(friendly(error), true);
+  await loadAll(); rCatalogo();
+}
+
+init();
+</script>
+</body>
+</html>
