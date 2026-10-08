@@ -194,14 +194,41 @@ function friendly(e) { return (e?.message || String(e)).replace(/^.*?ERROR:\s*/,
 
 /* ---------- sesión ---------- */
 async function init() {
+  const cfg = configError();
+  if (cfg) { $('login').style.display = 'flex'; $('lgErr').textContent = cfg; return; }
   const { data } = await sb.auth.getSession();
   if (!data.session) { $('login').style.display = 'flex'; return; }
   S.user = data.session.user;
   await boot();
 }
+function configError() {
+  if (SUPABASE_URL.includes('TU-PROYECTO') || SUPABASE_ANON_KEY.includes('TU-ANON'))
+    return 'Falta configurar la página: reemplazá SUPABASE_URL y SUPABASE_ANON_KEY al principio del <script> con los datos de tu proyecto (Supabase > Project Settings > API).';
+  if (!/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(SUPABASE_URL))
+    return 'SUPABASE_URL tiene un formato raro: "' + SUPABASE_URL + '". Debe ser exactamente https://xxxxxxxx.supabase.co, sin barra final ni /rest/v1.';
+  return null;
+}
+async function diagnoseFetch() {
+  try {
+    const r = await fetch(SUPABASE_URL + '/auth/v1/health', { headers: { apikey: SUPABASE_ANON_KEY } });
+    if (r.status === 401 || r.status === 403) return 'Supabase responde, pero rechaza la clave: SUPABASE_ANON_KEY no corresponde a este proyecto. Copiá la "anon public" del mismo proyecto.';
+    if (!r.ok) return 'Supabase respondió con error ' + r.status + '. Si el proyecto está pausado (plan gratuito), reactivalo desde el panel de Supabase.';
+    return 'Supabase responde bien; el problema fue momentáneo. Probá de nuevo.';
+  } catch (e) {
+    return 'No hay conexión con ' + SUPABASE_URL + '. Revisá: (1) que la URL esté bien copiada, (2) que el proyecto no esté pausado en Supabase, (3) bloqueadores de anuncios o la red de la empresa, (4) que tengas internet.';
+  }
+}
 async function doLogin() {
   $('lgErr').textContent = '';
-  const { data, error } = await sb.auth.signInWithPassword({ email: $('lgEmail').value.trim(), password: $('lgPass').value });
+  const cfg = configError();
+  if (cfg) { $('lgErr').textContent = cfg; return; }
+  let data, error;
+  try {
+    ({ data, error } = await sb.auth.signInWithPassword({ email: $('lgEmail').value.trim(), password: $('lgPass').value }));
+  } catch (e) { error = e; }
+  if (error && /fetch|network/i.test(error.message || '')) { $('lgErr').textContent = 'Verificando conexión…'; $('lgErr').textContent = await diagnoseFetch(); return; }
+  if (error && /invalid login/i.test(error.message || '')) { $('lgErr').textContent = 'Email o contraseña incorrectos (o el usuario no existe en este proyecto de Supabase).'; return; }
+  if (error && /not confirmed/i.test(error.message || '')) { $('lgErr').textContent = 'El usuario no está confirmado: en Supabase > Authentication > Users, confirmalo o volvé a crearlo tildando "Auto Confirm User".'; return; }
   if (error) { $('lgErr').textContent = 'No se pudo ingresar: ' + error.message; return; }
   S.user = data.user; $('login').style.display = 'none'; await boot();
 }
